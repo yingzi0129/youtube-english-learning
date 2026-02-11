@@ -42,10 +42,7 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // 登录成功，保存用户信息和 session token 到 localStorage
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('sessionToken', data.sessionToken);
-
+        // 登录成功，Supabase Auth 会自动管理 session（通过 cookies）
         // 跳转到首页
         router.push('/');
       } else {

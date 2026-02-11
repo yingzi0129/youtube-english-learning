@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseServer } from '@/lib/supabase-server';
-import bcrypt from 'bcryptjs';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,8 +29,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. 再次验证激活码是否有效
-    const { data: codeData, error: codeError } = await supabaseServer
+    const supabase = await createClient();
+
+    // 1. 验证激活码是否有效
+    const { data: codeData, error: codeError } = await supabase
       .from('activation_codes')
       .select('*')
       .eq('code', activationCode)
@@ -45,63 +46,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. 检查手机号是否已注册
-    const { data: existingUser } = await supabaseServer
-      .from('users')
-      .select('id')
-      .eq('phone', phone)
-      .single();
+    // 2. 使用 Supabase Auth 注册用户
+    // 将手机号作为 email（格式：phone@app.local）
+    const email = `${phone}@app.local`;
 
-    if (existingUser) {
-      return NextResponse.json(
-        { error: '该手机号已被注册' },
-        { status: 400 }
-      );
-    }
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          phone: phone,
+          activation_code: activationCode
+        }
+      }
+    });
 
-    // 3. 加密密码
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // 4. 创建用户
-    const { data: newUser, error: userError } = await supabaseServer
-      .from('users')
-      .insert({
-        phone,
-        password_hash: passwordHash,
-        activation_code: activationCode
-      })
-      .select()
-      .single();
-
-    if (userError) {
-      console.error('创建用户错误:', userError);
+    if (authError) {
+      if (authError.message.includes('already registered')) {
+        return NextResponse.json(
+          { error: '该手机号已被注册' },
+          { status: 400 }
+        );
+      }
+      console.error('注册错误:', authError);
       return NextResponse.json(
         { error: '注册失败，请稍后重试' },
         { status: 500 }
       );
     }
 
-    // 5. 标记激活码为已使用
-    const { error: updateError } = await supabaseServer
-      .from('activation_codes')
-      .update({
-        is_used: true,
-        used_by_user_id: newUser.id,
-        used_at: new Date().toISOString()
-      })
-      .eq('code', activationCode);
-
-    if (updateError) {
-      console.error('更新激活码状态错误:', updateError);
-      // 这里不返回错误，因为用户已经创建成功
+    // 3. 标记激活码为已使用
+    if (authData.user) {
+      await supabase
+        .from('activation_codes')
+        .update({
+          is_used: true,
+          used_by_user_id: authData.user.id,
+          used_at: new Date().toISOString()
+        })
+        .eq('code', activationCode);
     }
 
     return NextResponse.json({
       success: true,
       message: '注册成功',
       user: {
-        id: newUser.id,
-        phone: newUser.phone
+        id: authData.user?.id,
+        phone: phone
       }
     });
   } catch (error) {

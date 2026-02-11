@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseServer } from '@/lib/supabase-server';
-import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,52 +13,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. 查询用户
-    const { data: user, error } = await supabaseServer
-      .from('users')
-      .select('*')
-      .eq('phone', phone)
-      .single();
+    const supabase = await createClient();
 
-    if (error || !user) {
+    // 使用 Supabase Auth 登录
+    // 将手机号转换为 email 格式
+    const email = `${phone}@app.local`;
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
       return NextResponse.json(
         { error: '手机号或密码错误' },
         { status: 401 }
       );
     }
 
-    // 2. 验证密码
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-
-    if (!isPasswordValid) {
-      return NextResponse.json(
-        { error: '手机号或密码错误' },
-        { status: 401 }
-      );
-    }
-
-    // 3. 生成新的 session token
-    const sessionToken = crypto.randomBytes(32).toString('hex');
-
-    // 4. 更新用户的 session token 和最后登录时间
-    await supabaseServer
-      .from('users')
-      .update({
-        session_token: sessionToken,
-        last_login_at: new Date().toISOString()
-      })
-      .eq('id', user.id);
-
-    // 5. 返回用户信息和 session token
+    // 返回用户信息
     return NextResponse.json({
       success: true,
       message: '登录成功',
       user: {
-        id: user.id,
-        phone: user.phone,
-        created_at: user.created_at
-      },
-      sessionToken: sessionToken
+        id: data.user.id,
+        phone: data.user.user_metadata.phone,
+        created_at: data.user.created_at
+      }
     });
   } catch (error) {
     console.error('登录错误:', error);
