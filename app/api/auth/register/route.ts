@@ -36,7 +36,17 @@ export async function POST(request: NextRequest) {
       code_input: activationCode
     });
 
-    if (verifyError || !isValid) {
+    console.log('验证激活码结果:', { isValid, verifyError });
+
+    if (verifyError) {
+      console.error('验证激活码 RPC 错误:', verifyError);
+      return NextResponse.json(
+        { error: '激活码验证失败：' + verifyError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!isValid) {
       return NextResponse.json(
         { error: '激活码无效或已被使用' },
         { status: 400 }
