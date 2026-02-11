@@ -31,15 +31,12 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // 1. 验证激活码是否有效
-    const { data: codeData, error: codeError } = await supabase
-      .from('activation_codes')
-      .select('*')
-      .eq('code', activationCode)
-      .eq('is_used', false)
-      .single();
+    // 1. 使用 RPC 函数验证激活码（安全）
+    const { data: isValid, error: verifyError } = await supabase.rpc('verify_activation_code', {
+      code_input: activationCode
+    });
 
-    if (codeError || !codeData) {
+    if (verifyError || !isValid) {
       return NextResponse.json(
         { error: '激活码无效或已被使用' },
         { status: 400 }
@@ -75,16 +72,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. 标记激活码为已使用
+    // 3. 使用 RPC 函数标记激活码为已使用（安全）
     if (authData.user) {
-      await supabase
-        .from('activation_codes')
-        .update({
-          is_used: true,
-          used_by_user_id: authData.user.id,
-          used_at: new Date().toISOString()
-        })
-        .eq('code', activationCode);
+      const { data: marked, error: markError } = await supabase.rpc('mark_activation_code_used', {
+        code_input: activationCode,
+        user_id_input: authData.user.id
+      });
+
+      if (markError || !marked) {
+        console.error('标记激活码错误:', markError);
+        // 注意：用户已创建，但激活码未标记，这是一个边缘情况
+      }
     }
 
     return NextResponse.json({
