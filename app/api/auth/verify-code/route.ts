@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseServer } from '@/lib/supabase-server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 查询激活码是否存在且未使用
-    const { data, error } = await supabase
+    const { data, error } = await supabaseServer
       .from('activation_codes')
       .select('*')
       .eq('code', code)

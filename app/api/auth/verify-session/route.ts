@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseServer } from '@/lib/supabase-server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 查询用户的 session token
-    const { data: user, error } = await supabase
+    const { data: user, error } = await supabaseServer
       .from('users')
       .select('session_token')
       .eq('id', userId)

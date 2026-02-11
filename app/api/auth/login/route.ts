@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseServer } from '@/lib/supabase-server';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. 查询用户
-    const { data: user, error } = await supabase
+    const { data: user, error } = await supabaseServer
       .from('users')
       .select('*')
       .eq('phone', phone)
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     const sessionToken = crypto.randomBytes(32).toString('hex');
 
     // 4. 更新用户的 session token 和最后登录时间
-    await supabase
+    await supabaseServer
       .from('users')
       .update({
         session_token: sessionToken,

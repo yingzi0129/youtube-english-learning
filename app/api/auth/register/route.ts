@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseServer } from '@/lib/supabase-server';
 import bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. 再次验证激活码是否有效
-    const { data: codeData, error: codeError } = await supabase
+    const { data: codeData, error: codeError } = await supabaseServer
       .from('activation_codes')
       .select('*')
       .eq('code', activationCode)
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. 检查手机号是否已注册
-    const { data: existingUser } = await supabase
+    const { data: existingUser } = await supabaseServer
       .from('users')
       .select('id')
       .eq('phone', phone)
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     const passwordHash = await bcrypt.hash(password, 10);
 
     // 4. 创建用户
-    const { data: newUser, error: userError } = await supabase
+    const { data: newUser, error: userError } = await supabaseServer
       .from('users')
       .insert({
         phone,
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. 标记激活码为已使用
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseServer
       .from('activation_codes')
       .update({
         is_used: true,
