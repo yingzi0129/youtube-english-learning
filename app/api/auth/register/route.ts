@@ -84,14 +84,23 @@ export async function POST(request: NextRequest) {
 
     // 3. 使用 RPC 函数标记激活码为已使用（安全）
     if (authData.user) {
+      console.log('开始标记激活码，用户ID:', authData.user.id, '激活码:', activationCode);
+
       const { data: marked, error: markError } = await supabase.rpc('mark_activation_code_used', {
         code_input: activationCode,
         user_id_input: authData.user.id
       });
 
-      if (markError || !marked) {
-        console.error('标记激活码错误:', markError);
-        // 注意：用户已创建，但激活码未标记，这是一个边缘情况
+      console.log('标记激活码结果:', { marked, markError });
+
+      if (markError) {
+        console.error('标记激活码 RPC 错误:', markError);
+        // 用户已创建，但激活码未标记
+        // 继续返回成功，但记录错误
+      }
+
+      if (!marked) {
+        console.warn('激活码未能标记为已使用，可能已被使用或不存在');
       }
     }
 
