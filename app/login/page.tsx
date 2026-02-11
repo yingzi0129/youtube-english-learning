@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -13,13 +13,13 @@ export default function LoginPage() {
   const [successMessage, setSuccessMessage] = useState('');
 
   // 检查是否是注册后跳转过来的，或者是 session 过期
-  useState(() => {
+  useEffect(() => {
     if (searchParams.get('registered') === 'true') {
       setSuccessMessage('注册成功！请登录');
     } else if (searchParams.get('expired') === 'true') {
       setError('您的账号在其他地方登录，请重新登录');
     }
-  });
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,5 +153,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
