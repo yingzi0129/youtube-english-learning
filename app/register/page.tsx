@@ -19,17 +19,29 @@ export default function RegisterPage() {
     setError('');
     setIsLoading(true);
 
-    // 模拟验证激活码
-    setTimeout(() => {
-      setIsLoading(false);
-      // 这里添加实际的激活码验证逻辑
-      if (activationCode === '123456') {
-        // 激活码正确，进入第二步
+    try {
+      const response = await fetch('/api/auth/verify-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code: activationCode }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // 激活码验证成功，进入第二步
         setStep(2);
       } else {
-        setError('激活码错误，请重新输入');
+        setError(data.error || '激活码验证失败');
       }
-    }, 1000);
+    } catch (error) {
+      console.error('验证激活码错误:', error);
+      setError('网络错误，请稍后重试');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // 创建账户
@@ -50,13 +62,33 @@ export default function RegisterPage() {
 
     setIsLoading(true);
 
-    // 模拟创建账户
-    setTimeout(() => {
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: phoneNumber,
+          password: password,
+          activationCode: activationCode,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // 注册成功，跳转到登录页
+        router.push('/login?registered=true');
+      } else {
+        setError(data.error || '注册失败，请稍后重试');
+      }
+    } catch (error) {
+      console.error('注册错误:', error);
+      setError('网络错误，请稍后重试');
+    } finally {
       setIsLoading(false);
-      console.log('注册信息:', { phoneNumber, password });
-      // 注册成功后跳转到登录页
-      router.push('/login');
-    }, 1000);
+    }
   };
 
   return (

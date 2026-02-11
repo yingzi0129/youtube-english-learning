@@ -1,25 +1,62 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function LoginPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // 检查是否是注册后跳转过来的，或者是 session 过期
+  useState(() => {
+    if (searchParams.get('registered') === 'true') {
+      setSuccessMessage('注册成功！请登录');
+    } else if (searchParams.get('expired') === 'true') {
+      setError('您的账号在其他地方登录，请重新登录');
+    }
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setSuccessMessage('');
     setIsLoading(true);
 
-    // 这里添加登录逻辑
-    console.log('登录信息:', { phoneNumber, password });
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: phoneNumber,
+          password: password,
+        }),
+      });
 
-    // 模拟登录请求
-    setTimeout(() => {
+      const data = await response.json();
+
+      if (response.ok) {
+        // 登录成功，保存用户信息和 session token 到 localStorage
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('sessionToken', data.sessionToken);
+
+        // 跳转到首页
+        router.push('/');
+      } else {
+        setError(data.error || '登录失败，请稍后重试');
+      }
+    } catch (error) {
+      console.error('登录错误:', error);
+      setError('网络错误，请稍后重试');
+    } finally {
       setIsLoading(false);
-      // 登录成功后跳转到首页
-      // window.location.href = '/';
-    }, 1000);
+    }
   };
 
   return (
@@ -40,6 +77,20 @@ export default function LoginPage() {
             </h1>
             <p className="text-gray-600 mt-2">登录继续你的英语学习之旅</p>
           </div>
+
+          {/* 成功提示 */}
+          {successMessage && (
+            <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-xl">
+              <p className="text-sm text-green-600 text-center">{successMessage}</p>
+            </div>
+          )}
+
+          {/* 错误提示 */}
+          {error && (
+            <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-sm text-red-600 text-center">{error}</p>
+            </div>
+          )}
 
           {/* 登录表单 */}
           <form onSubmit={handleSubmit} className="space-y-6">
