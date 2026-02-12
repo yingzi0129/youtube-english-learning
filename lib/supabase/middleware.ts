@@ -39,5 +39,23 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // 检查管理员路由权限
+  if (user && request.nextUrl.pathname.startsWith('/admin')) {
+    // 使用RPC函数查询用户角色（绕过RLS限制）
+    const { data: role, error: roleError } = await supabase.rpc('get_user_role')
+
+    console.log('检查管理员权限:', { userId: user.id, role, roleError })
+
+    // 如果不是管理员，重定向到首页
+    if (roleError || !role || role !== 'admin') {
+      console.log('非管理员访问，重定向到首页')
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
+
+    console.log('管理员访问通过')
+  }
+
   return supabaseResponse
 }

@@ -55,18 +55,21 @@ export default function Calendar() {
   }
 
   return (
-    <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+    <div className="bg-white/90 backdrop-blur-md rounded-3xl p-6 shadow-lg border border-purple-100/50">
       {/* 日历头部 */}
-      <div className="flex items-center justify-between mb-4">
-        <button className="p-1 hover:bg-gray-100 rounded">
+      <div className="flex items-center justify-between mb-6">
+        <button className="p-2 hover:bg-purple-50 rounded-xl transition-colors">
           <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <h3 className="text-base font-semibold text-gray-900">
-          {monthNames[month]} {year}
-        </h3>
-        <button className="p-1 hover:bg-gray-100 rounded">
+        <div className="text-center">
+          <h3 className="text-base font-bold text-gray-900">
+            {monthNames[month]}
+          </h3>
+          <p className="text-sm text-gray-500 font-medium">{year}</p>
+        </div>
+        <button className="p-2 hover:bg-purple-50 rounded-xl transition-colors">
           <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
@@ -74,23 +77,26 @@ export default function Calendar() {
       </div>
 
       {/* 星期标题 */}
-      <div className="grid grid-cols-7 gap-1 mb-2">
-        {['Mon', 'Tues', 'Wed', 'Thurs', 'Fri', 'Sat', 'Sun'].map((day) => (
-          <div key={day} className="text-center text-xs text-gray-500 font-medium py-2">
+      <div className="grid grid-cols-7 gap-1 mb-3">
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+          <div key={day} className="text-center text-xs text-gray-500 font-semibold py-2">
             {day}
           </div>
         ))}
       </div>
 
       {/* 日期网格 */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1.5">
         {calendarDays.map((dateInfo, index) => (
           <div
             key={index}
             className={`
-              text-center py-2 text-sm rounded cursor-pointer
-              ${dateInfo.isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
-              ${dateInfo.isToday ? 'bg-blue-600 text-white font-semibold' : 'hover:bg-gray-100'}
+              text-center py-2.5 text-sm rounded-xl cursor-pointer transition-all duration-200
+              ${dateInfo.isCurrentMonth ? 'text-gray-900 font-medium' : 'text-gray-400'}
+              ${dateInfo.isToday
+                ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white font-bold shadow-md hover:shadow-lg'
+                : 'hover:bg-purple-50 hover:text-purple-600'
+              }
             `}
           >
             {dateInfo.day}

@@ -4,107 +4,131 @@ import Calendar from './components/Calendar';
 import LearningNotifications from './components/LearningNotifications';
 import SearchFilters from './components/SearchFilters';
 import VideoCard from './components/VideoCard';
+import { createClient } from '@/lib/supabase/server';
+import { getUserRole } from '@/lib/auth/permissions';
 
-// 示例视频数据
-const videos = [
-  {
-    id: '1',
-    title: '制作午餐沙拉',
-    description: 'Birta Hlin在做一周饮食里的午餐沙拉，主要聊...',
-    thumbnail: '/placeholder-video-1.jpg',
-    duration: '2分钟',
-    creator: 'Birta Hlin',
-    tags: ['日常生活', '健康养生'],
-    difficulty: '中级' as const,
-    date: '2026/1/26',
-  },
-  {
-    id: '2',
-    title: '偶遇美味小酒馆',
-    description: '没有计划的旅行到底该不该？博主在这段视频中...',
-    thumbnail: '/placeholder-video-2.jpg',
-    duration: '2分钟',
-    creator: 'Birta Hlin',
-    tags: ['城市旅行', '美食配送'],
-    difficulty: '初级' as const,
-    date: '2026/1/23',
-  },
-  {
-    id: '3',
-    title: '巴黎下午的小计划',
-    description: 'Birta聊在巴黎下午的小计划，书店找书、超市...',
-    thumbnail: '/placeholder-video-3.jpg',
-    duration: '2分钟',
-    creator: 'Birta Hlin',
-    tags: ['城市旅行', '日常生活'],
-    difficulty: '初级' as const,
-    date: '2026/1/23',
-  },
-  {
-    id: '4',
-    title: '今日美妆和OOTD',
-    description: '怎么用英语分享美妆和穿搭？Birta Hlin在这段...',
-    thumbnail: '/placeholder-video-4.jpg',
-    duration: '2分钟',
-    creator: 'Birta Hlin',
-    tags: ['美妆护肤', '日常生活'],
-    difficulty: '初级' as const,
-    date: '2026/1/20',
-  },
-  {
-    id: '5',
-    title: '超好吃的可颂',
-    description: '旅行早上起床吃了1块可颂，结果被到别人生气好...',
-    thumbnail: '/placeholder-video-5.jpg',
-    duration: '1分钟',
-    creator: 'Birta Hlin',
-    tags: ['城市旅行', '美食配送'],
-    difficulty: '初级' as const,
-    date: '2026/1/10',
-  },
-  {
-    id: '6',
-    title: '期待已久的巴黎行',
-    description: 'Birta Hlin 和朋友小唐最喜欢去飞去巴黎，聊聊为...',
-    thumbnail: '/placeholder-video-6.jpg',
-    duration: '2分钟',
-    creator: 'Birta Hlin',
-    tags: ['城市旅行', '观点表达'],
-    difficulty: '初级' as const,
-    date: '2026/1/9',
-  },
-];
+export default async function Home() {
+  // 获取当前用户角色
+  const userRole = await getUserRole();
+  const isAdmin = userRole === 'admin';
 
-export default function Home() {
+  // 从数据库获取视频数据
+  const supabase = await createClient();
+  const { data: videosData, error } = await supabase
+    .from('videos')
+    .select('*')
+    .eq('is_deleted', false)
+    .order('published_at', { ascending: false });
+
+  // 调试：打印错误信息
+  if (error) {
+    console.error('获取视频数据错误:', error);
+  }
+
+  // 调试：打印获取到的数据
+  console.log('获取到的视频数据:', videosData);
+  console.log('视频数量:', videosData?.length || 0);
+
+  // 格式化视频数据
+  const videos = videosData?.map((video) => ({
+    id: video.id,
+    title: video.title,
+    description: video.description,
+    thumbnail: video.thumbnail_url,
+    duration: `${video.duration_minutes}分钟`,
+    creator: video.creator_name,
+    tags: video.tags || [],
+    difficulty: video.difficulty as '初级' | '中级' | '高级',
+    date: new Date(video.published_at).toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    }).replace(/\//g, '/'),
+  })) || [];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
-      <Header />
+      <Header isAdmin={isAdmin} />
 
-      {/* 居中容器 */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* 左侧边栏 - 在移动端显示在顶部 */}
-          <aside className="w-full lg:w-72 flex-shrink-0 space-y-4">
-            <LearningStats />
-            <div className="hidden lg:block">
+      {/* 顶部统计区域 - 全宽展示 */}
+      <div className="bg-white/60 backdrop-blur-md border-b border-purple-100/50 shadow-sm">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <LearningStats />
+        </div>
+      </div>
+
+      {/* 主内容容器 */}
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 筛选器区域 */}
+        <div className="mb-8">
+          <SearchFilters />
+        </div>
+
+        {/* 内容区域 - 三栏布局 */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8">
+          {/* 左侧日历区域 */}
+          <aside className="hidden xl:block xl:col-span-3">
+            <div className="sticky top-24 space-y-6">
               <Calendar />
-            </div>
-            <div className="hidden lg:block">
               <LearningNotifications />
             </div>
           </aside>
 
-          {/* 主内容区 */}
-          <main className="flex-1 min-w-0">
-            <SearchFilters />
+          {/* 中间视频网格区域 */}
+          <main className="xl:col-span-9">
+            {/* 错误提示 */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-6 mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h3 className="text-lg font-bold text-red-900">数据加载失败</h3>
+                </div>
+                <p className="text-red-700 mb-2">错误信息: {error.message}</p>
+                <p className="text-sm text-red-600">请检查数据库连接或刷新页面重试</p>
+              </div>
+            )}
 
-            {/* 视频网格 - 响应式布局 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-              {videos.map((video) => (
-                <VideoCard key={video.id} {...video} />
-              ))}
-            </div>
+            {/* 空状态提示 */}
+            {!error && videos.length === 0 && (
+              <div className="bg-white/90 backdrop-blur-md rounded-3xl p-12 text-center shadow-lg border border-purple-100/50">
+                <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-10 h-10 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">暂无视频</h3>
+                <p className="text-gray-600 mb-4">数据库中还没有视频数据，请先添加视频</p>
+                <p className="text-sm text-gray-500">提示：请在Supabase中向videos表添加数据</p>
+              </div>
+            )}
+
+            {/* 视频网格 */}
+            {!error && videos.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-3 gap-5 lg:gap-6">
+                {videos.map((video) => (
+                  <VideoCard key={video.id} {...video} />
+                ))}
+              </div>
+            )}
+
+            {/* 调试信息（开发环境） */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="mt-6 p-4 bg-gray-100 rounded-lg text-xs">
+                <p className="font-bold mb-2">调试信息:</p>
+                <p>视频数量: {videos.length}</p>
+                <p>是否有错误: {error ? '是' : '否'}</p>
+                {error && <p className="text-red-600">错误: {JSON.stringify(error)}</p>}
+              </div>
+            )}
           </main>
+        </div>
+
+        {/* 移动端日历和通知 */}
+        <div className="xl:hidden mt-8 space-y-6">
+          <Calendar />
+          <LearningNotifications />
         </div>
       </div>
     </div>
