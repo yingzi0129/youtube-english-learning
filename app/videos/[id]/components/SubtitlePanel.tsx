@@ -86,7 +86,6 @@ export default function SubtitlePanel({
         .eq('video_id', videoId);
 
       if (error) {
-        console.error('加载录音记录失败:', error);
         return;
       }
 
@@ -125,19 +124,19 @@ export default function SubtitlePanel({
   };
 
   return (
-    <div className="bg-white/90 backdrop-blur-md rounded-3xl shadow-lg border border-purple-100/50 overflow-hidden sticky top-24">
+    <div className="bg-white/90 backdrop-blur-md rounded-3xl shadow-lg border border-purple-100/50 overflow-hidden lg:sticky lg:top-24">
       {/* 标题和功能图标 */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
+        <div className="flex items-center justify-between mb-2 lg:mb-3">
+          <h2 className="text-base lg:text-lg font-bold text-gray-900 flex items-center gap-2">
+            <svg className="w-4 h-4 lg:w-5 lg:h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
             </svg>
             动态字幕
           </h2>
 
           {/* 功能图标按钮组 */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 lg:gap-2">
             {/* 循环播放图标 */}
             <div className="relative">
               <button
@@ -145,17 +144,17 @@ export default function SubtitlePanel({
                   setShowLoopMenu(!showLoopMenu);
                   setShowPracticeMenu(false);
                 }}
-                className="w-9 h-9 rounded-lg bg-white hover:bg-purple-50 flex items-center justify-center transition-colors shadow-sm border border-purple-100"
+                className="w-8 h-8 lg:w-9 lg:h-9 rounded-lg bg-white hover:bg-purple-50 flex items-center justify-center transition-colors shadow-sm border border-purple-100"
                 title="循环播放"
               >
-                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 lg:w-5 lg:h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
 
               {/* 循环播放下拉菜单 */}
               {showLoopMenu && (
-                <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-purple-100 py-2 z-20">
+                <div className="absolute top-full right-0 mt-2 w-56 lg:w-64 bg-white rounded-xl shadow-lg border border-purple-100 py-2 z-20">
                   {/* 视频循环模式 */}
                   <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">视频循环</div>
                   <button
@@ -270,17 +269,17 @@ export default function SubtitlePanel({
                   setShowPracticeMenu(!showPracticeMenu);
                   setShowLoopMenu(false);
                 }}
-                className="w-9 h-9 rounded-lg bg-white hover:bg-purple-50 flex items-center justify-center transition-colors shadow-sm border border-purple-100"
+                className="w-8 h-8 lg:w-9 lg:h-9 rounded-lg bg-white hover:bg-purple-50 flex items-center justify-center transition-colors shadow-sm border border-purple-100"
                 title="英语练习"
               >
-                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 lg:w-5 lg:h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </button>
 
               {/* 英语练习下拉菜单 */}
               {showPracticeMenu && (
-                <div className="absolute top-full right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-purple-100 py-2 z-20">
+                <div className="absolute top-full right-0 mt-2 w-36 lg:w-40 bg-white rounded-xl shadow-lg border border-purple-100 py-2 z-20">
                   <button
                     onClick={() => {
                       setIsPracticeMode(!isPracticeMode);
@@ -298,10 +297,10 @@ export default function SubtitlePanel({
         </div>
 
         {/* 语言切换按钮 */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 lg:gap-2">
           <button
             onClick={() => setSubtitleMode('bilingual')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+            className={`px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-lg text-xs lg:text-sm font-medium transition-all ${
               subtitleMode === 'bilingual'
                 ? 'bg-purple-600 text-white shadow-md'
                 : 'bg-white text-gray-700 hover:bg-purple-50 border border-gray-200'
@@ -311,7 +310,7 @@ export default function SubtitlePanel({
           </button>
           <button
             onClick={() => setSubtitleMode('chinese')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+            className={`px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-lg text-xs lg:text-sm font-medium transition-all ${
               subtitleMode === 'chinese'
                 ? 'bg-purple-600 text-white shadow-md'
                 : 'bg-white text-gray-700 hover:bg-purple-50 border border-gray-200'
@@ -321,7 +320,7 @@ export default function SubtitlePanel({
           </button>
           <button
             onClick={() => setSubtitleMode('english')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+            className={`px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-lg text-xs lg:text-sm font-medium transition-all ${
               subtitleMode === 'english'
                 ? 'bg-purple-600 text-white shadow-md'
                 : 'bg-white text-gray-700 hover:bg-purple-50 border border-gray-200'
@@ -333,7 +332,7 @@ export default function SubtitlePanel({
       </div>
 
       {/* 字幕列表 */}
-      <div className="h-[600px] overflow-y-auto p-4 space-y-3">
+      <div className="h-[400px] lg:h-[600px] overflow-y-auto p-3 lg:p-4 space-y-2 lg:space-y-3">
         {subtitles.map((subtitle) => {
           const isActive = subtitle.id === activeSubtitleId;
 
@@ -341,7 +340,7 @@ export default function SubtitlePanel({
             <div
               key={subtitle.id}
               className={`
-                p-4 rounded-2xl border-2 transition-all duration-300 cursor-pointer
+                p-3 lg:p-4 rounded-xl lg:rounded-2xl border-2 transition-all duration-300 cursor-pointer
                 ${
                   isActive
                     ? 'bg-yellow-50 border-yellow-400 shadow-md'
@@ -354,7 +353,7 @@ export default function SubtitlePanel({
               <div className="flex items-center gap-2 mb-2">
                 <span
                   className={`
-                    text-xs font-bold px-2 py-1 rounded-full
+                    text-xs font-bold px-2 py-0.5 lg:py-1 rounded-full
                     ${isActive ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-100 text-gray-600'}
                   `}
                 >
@@ -374,7 +373,7 @@ export default function SubtitlePanel({
               {(subtitleMode === 'bilingual' || subtitleMode === 'english') && (
                 <p
                   className={`
-                    text-lg leading-relaxed
+                    text-sm lg:text-lg leading-relaxed
                     ${subtitleMode === 'bilingual' ? 'mb-2' : ''}
                     ${isActive ? 'text-gray-900 font-semibold' : 'text-gray-700'}
                   `}
@@ -386,7 +385,7 @@ export default function SubtitlePanel({
               {/* 中文翻译 */}
               {(subtitleMode === 'bilingual' || subtitleMode === 'chinese') && (
                 <p className={`
-                  text-sm leading-relaxed
+                  text-xs lg:text-sm leading-relaxed
                   ${isActive ? 'text-gray-700' : 'text-gray-600'}
                 `}>
                   {subtitle.translation}
@@ -395,7 +394,7 @@ export default function SubtitlePanel({
 
               {/* 口语练习录音控件 */}
               {isPracticeMode && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
+                <div className="mt-2 lg:mt-3 pt-2 lg:pt-3 border-t border-gray-200">
                   <AudioRecorder
                     videoId={videoId}
                     subtitleId={subtitle.id}

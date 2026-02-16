@@ -246,7 +246,7 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
       {/* 左侧：视频播放器 */}
       <div className="lg:col-span-2">
         <VideoPlayer

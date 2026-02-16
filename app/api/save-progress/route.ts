@@ -43,7 +43,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('保存观看进度失败:', error);
     return NextResponse.json({ error: '保存失败' }, { status: 500 });
   }
 }

@@ -105,42 +105,42 @@ export default function LearningStats() {
   }
 
   return (
-    <div className="bg-white/90 backdrop-blur-md rounded-3xl p-6 lg:p-8 shadow-lg border border-purple-100/50">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+    <div className="bg-white/90 backdrop-blur-md rounded-2xl lg:rounded-3xl p-4 lg:p-6 xl:p-8 shadow-lg border border-purple-100/50">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 lg:gap-6">
         {/* 标题区域 */}
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-lg">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex items-center gap-2.5 lg:gap-3">
+          <div className="w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl lg:rounded-2xl flex items-center justify-center shadow-lg">
+            <svg className="w-5 h-5 lg:w-6 lg:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
           </div>
           <div>
-            <h2 className="text-lg lg:text-xl font-bold text-gray-900">学习数据概览</h2>
-            <p className="text-sm text-gray-500 mt-0.5">持续学习，每天进步一点点</p>
+            <h2 className="text-base lg:text-lg xl:text-xl font-bold text-gray-900">学习数据概览</h2>
+            <p className="text-xs lg:text-sm text-gray-500 mt-0.5">持续学习，每天进步一点点</p>
           </div>
         </div>
 
         {/* 统计数据和打卡按钮区域 */}
-        <div className="flex items-center gap-6 lg:gap-8">
+        <div className="flex items-center justify-around lg:justify-start gap-4 lg:gap-6 xl:gap-8">
           {/* 总期数 */}
           <div className="text-center">
-            <div className="text-4xl lg:text-5xl font-bold bg-gradient-to-br from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
+            <div className="text-3xl lg:text-4xl xl:text-5xl font-bold bg-gradient-to-br from-purple-600 to-pink-600 bg-clip-text text-transparent mb-1 lg:mb-2">
               {stats.videoCount}
             </div>
-            <div className="text-sm text-gray-600 font-medium">总期数</div>
+            <div className="text-xs lg:text-sm text-gray-600 font-medium">总期数</div>
           </div>
 
-          <div className="w-px h-16 bg-gradient-to-b from-transparent via-purple-300 to-transparent"></div>
+          <div className="w-px h-12 lg:h-16 bg-gradient-to-b from-transparent via-purple-300 to-transparent"></div>
 
           {/* 打卡天数 */}
           <div className="text-center">
-            <div className="text-4xl lg:text-5xl font-bold bg-gradient-to-br from-emerald-500 to-teal-500 bg-clip-text text-transparent mb-2">
+            <div className="text-3xl lg:text-4xl xl:text-5xl font-bold bg-gradient-to-br from-emerald-500 to-teal-500 bg-clip-text text-transparent mb-1 lg:mb-2">
               {stats.checkInDays}
             </div>
-            <div className="text-sm text-gray-600 font-medium">打卡天数</div>
+            <div className="text-xs lg:text-sm text-gray-600 font-medium">打卡天数</div>
           </div>
 
-          <div className="w-px h-16 bg-gradient-to-b from-transparent via-purple-300 to-transparent"></div>
+          <div className="w-px h-12 lg:h-16 bg-gradient-to-b from-transparent via-purple-300 to-transparent"></div>
 
           {/* 今日打卡按钮 */}
           <div className="text-center">
@@ -148,7 +148,7 @@ export default function LearningStats() {
               onClick={handleCheckIn}
               disabled={stats.hasCheckedInToday || isCheckingIn}
               className={`
-                px-6 py-3 rounded-2xl font-bold text-white shadow-lg transition-all duration-300
+                px-4 py-2 lg:px-6 lg:py-3 rounded-xl lg:rounded-2xl font-bold text-white text-sm lg:text-base shadow-lg transition-all duration-300
                 ${stats.hasCheckedInToday
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-gradient-to-br from-sky-500 to-blue-500 hover:from-sky-600 hover:to-blue-600 hover:shadow-xl hover:scale-105'
@@ -158,7 +158,7 @@ export default function LearningStats() {
             >
               {isCheckingIn ? (
                 <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-4 w-4 lg:h-5 lg:w-5" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>

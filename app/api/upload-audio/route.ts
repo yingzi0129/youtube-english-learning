@@ -33,13 +33,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '缺少必要参数' }, { status: 400 });
     }
 
-    // 生成文件名
-    const fileName = `${user.id}/${videoId}/${subtitleId}_${Date.now()}.webm`;
+    // 生成固定的文件名（不使用时间戳，七牛云会自动覆盖同名文件）
+    const fileName = `${user.id}/${videoId}/${subtitleId}.webm`;
 
-    // 生成上传凭证
+    // 生成上传凭证（允许覆盖同名文件）
     const mac = new qiniu.auth.digest.Mac(QINIU_ACCESS_KEY, QINIU_SECRET_KEY);
     const options = {
-      scope: QINIU_BUCKET,
+      scope: `${QINIU_BUCKET}:${fileName}`, // 指定文件名，允许覆盖
       expires: 3600,
     };
     const putPolicy = new qiniu.rs.PutPolicy(options);
@@ -97,7 +97,6 @@ export async function POST(request: NextRequest) {
       audioUrl: publicUrl,
     });
   } catch (error) {
-    console.error('上传音频失败:', error);
     return NextResponse.json({ error: '上传失败' }, { status: 500 });
   }
 }

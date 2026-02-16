@@ -143,7 +143,6 @@ export default function AudioRecorder({
         });
       }, 1000);
     } catch (error) {
-      console.error('录音失败');
       alert('无法访问麦克风，请检查权限设置');
     }
   };
@@ -211,7 +210,6 @@ export default function AudioRecorder({
         onRecordingComplete(publicUrl);
       }
     } catch (error) {
-      console.error('上传失败:', error);
       alert(`录音上传失败，请重试`);
     } finally {
       setIsUploading(false);

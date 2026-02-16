@@ -68,8 +68,8 @@ export default function VideoPlayer({ videoUrl, onTimeUpdate, onDurationChange, 
         const handleSeeked = () => {
           const playPromise = video.play();
           if (playPromise !== undefined) {
-            playPromise.catch((error) => {
-              console.error('自动播放失败:', error);
+            playPromise.catch(() => {
+              // 自动播放失败，静默处理
             });
           }
           video.removeEventListener('seeked', handleSeeked);
@@ -85,9 +85,7 @@ export default function VideoPlayer({ videoUrl, onTimeUpdate, onDurationChange, 
 
   // 调试：输出接收到的视频 URL
   useEffect(() => {
-    console.log('VideoPlayer 接收到的 URL:', videoUrl);
-    console.log('URL 类型:', typeof videoUrl);
-    console.log('URL 是否为空:', !videoUrl);
+    // URL 验证逻辑已移除
   }, [videoUrl]);
 
   // 点击外部关闭倍速菜单
@@ -108,7 +106,6 @@ export default function VideoPlayer({ videoUrl, onTimeUpdate, onDurationChange, 
   }, [showSpeedMenu]);
 
   const handleLoadedData = () => {
-    console.log('视频加载成功');
     setIsLoading(false);
     setError(null);
 
@@ -121,11 +118,6 @@ export default function VideoPlayer({ videoUrl, onTimeUpdate, onDurationChange, 
   const handleError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     setIsLoading(false);
     setError('视频加载失败，请检查视频文件是否存在或格式是否正确');
-    console.error('视频加载错误:', e);
-    console.error('视频 URL:', videoUrl);
-    const videoElement = e.currentTarget;
-    console.error('视频元素错误代码:', videoElement.error?.code);
-    console.error('视频元素错误信息:', videoElement.error?.message);
   };
 
   // 快退 5 秒
@@ -192,28 +184,28 @@ export default function VideoPlayer({ videoUrl, onTimeUpdate, onDurationChange, 
       </div>
 
       {/* 自定义控制面板 */}
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-6 py-4 border-t border-purple-100">
-        <div className="flex items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-4 lg:px-6 py-3 lg:py-4 border-t border-purple-100">
+        <div className="flex items-center justify-between gap-3 lg:gap-4">
           {/* 左侧：快退/快进按钮 */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 lg:gap-2">
             <button
               onClick={handleRewind}
-              className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-purple-50 text-purple-600 rounded-xl transition-colors shadow-sm border border-purple-100"
+              className="flex items-center gap-1.5 px-3 py-1.5 lg:px-4 lg:py-2 bg-white hover:bg-purple-50 text-purple-600 rounded-xl transition-colors shadow-sm border border-purple-100"
               title="后退 5 秒"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" />
               </svg>
-              <span className="text-sm font-medium">-5s</span>
+              <span className="text-xs lg:text-sm font-medium">-5s</span>
             </button>
 
             <button
               onClick={handleForward}
-              className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-purple-50 text-purple-600 rounded-xl transition-colors shadow-sm border border-purple-100"
+              className="flex items-center gap-1.5 px-3 py-1.5 lg:px-4 lg:py-2 bg-white hover:bg-purple-50 text-purple-600 rounded-xl transition-colors shadow-sm border border-purple-100"
               title="快进 5 秒"
             >
-              <span className="text-sm font-medium">+5s</span>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <span className="text-xs lg:text-sm font-medium">+5s</span>
+              <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.933 12.8a1 1 0 000-1.6L6.6 7.2A1 1 0 005 8v8a1 1 0 001.6.8l5.333-4zM19.933 12.8a1 1 0 000-1.6l-5.333-4A1 1 0 0013 8v8a1 1 0 001.6.8l5.333-4z" />
               </svg>
             </button>
@@ -223,18 +215,18 @@ export default function VideoPlayer({ videoUrl, onTimeUpdate, onDurationChange, 
           <div className="relative">
             <button
               onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-              className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-purple-50 text-purple-600 rounded-xl transition-colors shadow-sm border border-purple-100"
+              className="flex items-center gap-1.5 px-3 py-1.5 lg:px-4 lg:py-2 bg-white hover:bg-purple-50 text-purple-600 rounded-xl transition-colors shadow-sm border border-purple-100"
               title="播放速度"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              <span className="text-sm font-medium">{playbackRate}x</span>
+              <span className="text-xs lg:text-sm font-medium">{playbackRate}x</span>
             </button>
 
             {/* 倍速菜单 */}
             {showSpeedMenu && (
-              <div className="absolute bottom-full right-0 mb-2 bg-white rounded-xl shadow-lg border border-purple-100 py-2 min-w-[120px] z-20">
+              <div className="absolute bottom-full right-0 mb-2 bg-white rounded-xl shadow-lg border border-purple-100 py-2 min-w-[100px] lg:min-w-[120px] z-20">
                 {speedOptions.map((speed) => (
                   <button
                     key={speed}
