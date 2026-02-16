@@ -1,12 +1,36 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
+import MultiSelect from './MultiSelect';
 
-export default function SearchFilters() {
-  const [difficulty, setDifficulty] = useState('全部');
-  const [duration, setDuration] = useState('全部');
-  const [creator, setCreator] = useState('Birta Hlin');
-  const [topic, setTopic] = useState('全部');
+export interface FilterOptions {
+  difficulty: string;
+  duration: string;
+  creators: string[];
+  tags: string[];
+}
+
+interface SearchFiltersProps {
+  allCreators: string[];
+  allTags: string[];
+  filters: FilterOptions;
+  onFilterChange: (filters: FilterOptions) => void;
+}
+
+export default function SearchFilters({
+  allCreators,
+  allTags,
+  filters,
+  onFilterChange,
+}: SearchFiltersProps) {
+  const handleReset = () => {
+    onFilterChange({
+      difficulty: '全部',
+      duration: '全部',
+      creators: [],
+      tags: [],
+    });
+  };
 
   return (
     <div className="bg-white/90 backdrop-blur-md rounded-3xl p-6 lg:p-8 shadow-lg border border-purple-100/50">
@@ -20,13 +44,16 @@ export default function SearchFilters() {
           </div>
           <h2 className="text-lg font-bold text-gray-900">筛选视频</h2>
         </div>
-        <button className="text-sm text-purple-600 hover:text-purple-700 font-semibold hover:underline transition-colors">
+        <button
+          onClick={handleReset}
+          className="text-sm text-purple-600 hover:text-purple-700 font-semibold hover:underline transition-colors"
+        >
           重置筛选
         </button>
       </div>
 
       {/* 筛选器网格 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 relative z-10">
         {/* 视频难度 */}
         <div>
           <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
@@ -36,8 +63,8 @@ export default function SearchFilters() {
             视频难度
           </label>
           <select
-            value={difficulty}
-            onChange={(e) => setDifficulty(e.target.value)}
+            value={filters.difficulty}
+            onChange={(e) => onFilterChange({ ...filters, difficulty: e.target.value })}
             className="w-full px-4 py-3 text-sm font-medium border-2 border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white hover:border-purple-300 transition-all cursor-pointer"
           >
             <option>全部</option>
@@ -56,8 +83,8 @@ export default function SearchFilters() {
             视频时长
           </label>
           <select
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
+            value={filters.duration}
+            onChange={(e) => onFilterChange({ ...filters, duration: e.target.value })}
             className="w-full px-4 py-3 text-sm font-medium border-2 border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white hover:border-purple-300 transition-all cursor-pointer"
           >
             <option>全部</option>
@@ -69,51 +96,32 @@ export default function SearchFilters() {
         </div>
 
         {/* 视频博主 */}
-        <div>
-          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
+        <MultiSelect
+          label="视频博主"
+          icon={
             <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
-            视频博主
-          </label>
-          <div className="relative">
-            <select
-              value={creator}
-              onChange={(e) => setCreator(e.target.value)}
-              className="w-full px-4 py-3 text-sm font-medium border-2 border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white hover:border-purple-300 transition-all cursor-pointer"
-            >
-              <option>全部</option>
-              <option>Birta Hlin</option>
-            </select>
-            {creator === 'Birta Hlin' && (
-              <span className="absolute -top-2 -right-2 inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-gradient-to-br from-purple-500 to-pink-500 rounded-full shadow-lg">
-                1
-              </span>
-            )}
-          </div>
-        </div>
+          }
+          options={allCreators}
+          selectedValues={filters.creators}
+          onChange={(values) => onFilterChange({ ...filters, creators: values })}
+          placeholder="选择博主"
+        />
 
         {/* 视频话题 */}
-        <div>
-          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
+        <MultiSelect
+          label="视频话题"
+          icon={
             <svg className="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
             </svg>
-            视频话题
-          </label>
-          <select
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            className="w-full px-4 py-3 text-sm font-medium border-2 border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white hover:border-purple-300 transition-all cursor-pointer"
-          >
-            <option>全部</option>
-            <option>日常生活</option>
-            <option>健康养生</option>
-            <option>城市旅行</option>
-            <option>美妆护肤</option>
-            <option>美食配送</option>
-          </select>
-        </div>
+          }
+          options={allTags}
+          selectedValues={filters.tags}
+          onChange={(values) => onFilterChange({ ...filters, tags: values })}
+          placeholder="选择话题"
+        />
       </div>
     </div>
   );

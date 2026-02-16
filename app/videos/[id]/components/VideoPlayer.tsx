@@ -5,10 +5,14 @@ import React, { useState, useEffect, useRef } from 'react';
 interface VideoPlayerProps {
   videoUrl: string;
   onTimeUpdate?: (time: number) => void;
+  onDurationChange?: (duration: number) => void;
+  onPlayStateChange?: (isPlaying: boolean) => void;
+  onPause?: () => void;
   seekToTime?: number;
+  autoPlayOnSeek?: boolean;
 }
 
-export default function VideoPlayer({ videoUrl, onTimeUpdate, seekToTime }: VideoPlayerProps) {
+export default function VideoPlayer({ videoUrl, onTimeUpdate, onDurationChange, onPlayStateChange, onPause, seekToTime, autoPlayOnSeek = false }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -24,12 +28,60 @@ export default function VideoPlayer({ videoUrl, onTimeUpdate, seekToTime }: Vide
     }
   };
 
+  // 监听播放状态变化
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handlePlay = () => {
+      if (onPlayStateChange) onPlayStateChange(true);
+    };
+
+    const handlePause = () => {
+      if (onPlayStateChange) onPlayStateChange(false);
+      if (onPause) onPause();
+    };
+
+    const handleEnded = () => {
+      if (onPlayStateChange) onPlayStateChange(false);
+      if (onPause) onPause();
+    };
+
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+    video.addEventListener('ended', handleEnded);
+
+    return () => {
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('ended', handleEnded);
+    };
+  }, [onPlayStateChange, onPause]);
+
   // 监听 seekToTime 变化，跳转到指定时间
   useEffect(() => {
     if (videoRef.current && seekToTime !== undefined) {
-      videoRef.current.currentTime = seekToTime;
+      const video = videoRef.current;
+
+      if (autoPlayOnSeek) {
+        // 监听 seeked 事件，确保跳转完成后再播放
+        const handleSeeked = () => {
+          const playPromise = video.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((error) => {
+              console.error('自动播放失败:', error);
+            });
+          }
+          video.removeEventListener('seeked', handleSeeked);
+        };
+
+        video.addEventListener('seeked', handleSeeked);
+        video.currentTime = seekToTime;
+      } else {
+        video.currentTime = seekToTime;
+      }
     }
-  }, [seekToTime]);
+  }, [seekToTime, autoPlayOnSeek]);
 
   // 调试：输出接收到的视频 URL
   useEffect(() => {
@@ -59,6 +111,11 @@ export default function VideoPlayer({ videoUrl, onTimeUpdate, seekToTime }: Vide
     console.log('视频加载成功');
     setIsLoading(false);
     setError(null);
+
+    // 通知父组件视频时长
+    if (videoRef.current && onDurationChange) {
+      onDurationChange(videoRef.current.duration);
+    }
   };
 
   const handleError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
@@ -102,8 +159,12 @@ export default function VideoPlayer({ videoUrl, onTimeUpdate, seekToTime }: Vide
       {/* 视频播放器容器 */}
       <div className="relative aspect-video bg-black">
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
-            <div className="text-white text-lg">加载中...</div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 z-10">
+            <div className="relative w-16 h-16 mb-4">
+              <div className="absolute inset-0 border-4 border-purple-200/30 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-transparent border-t-purple-500 rounded-full animate-spin"></div>
+            </div>
+            <div className="text-white text-lg font-medium">加载视频中...</div>
           </div>
         )}
 

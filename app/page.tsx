@@ -2,8 +2,7 @@ import Header from './components/Header';
 import LearningStats from './components/LearningStats';
 import Calendar from './components/Calendar';
 import LearningNotifications from './components/LearningNotifications';
-import SearchFilters from './components/SearchFilters';
-import VideoCard from './components/VideoCard';
+import VideoListWithFilters from './components/VideoListWithFilters';
 import { createClient } from '@/lib/supabase/server';
 import { getUserRole } from '@/lib/auth/permissions';
 
@@ -20,15 +19,6 @@ export default async function Home() {
     .eq('is_deleted', false)
     .order('published_at', { ascending: false });
 
-  // 调试：打印错误信息
-  if (error) {
-    console.error('获取视频数据错误:', error);
-  }
-
-  // 调试：打印获取到的数据
-  console.log('获取到的视频数据:', videosData);
-  console.log('视频数量:', videosData?.length || 0);
-
   // 格式化视频数据
   const videos = videosData?.map((video) => ({
     id: video.id,
@@ -36,6 +26,7 @@ export default async function Home() {
     description: video.description,
     thumbnail: video.thumbnail_url,
     duration: `${video.duration_minutes}分钟`,
+    duration_minutes: video.duration_minutes,
     creator: video.creator_name,
     tags: video.tags || [],
     difficulty: video.difficulty as '初级' | '中级' | '高级',
@@ -59,11 +50,6 @@ export default async function Home() {
 
       {/* 主内容容器 */}
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 筛选器区域 */}
-        <div className="mb-8">
-          <SearchFilters />
-        </div>
-
         {/* 内容区域 - 三栏布局 */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8">
           {/* 左侧日历区域 */}
@@ -104,24 +90,11 @@ export default async function Home() {
               </div>
             )}
 
-            {/* 视频网格 */}
+            {/* 视频列表和筛选 */}
             {!error && videos.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-3 gap-5 lg:gap-6">
-                {videos.map((video) => (
-                  <VideoCard key={video.id} {...video} />
-                ))}
-              </div>
+              <VideoListWithFilters videos={videos} />
             )}
 
-            {/* 调试信息（开发环境） */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-6 p-4 bg-gray-100 rounded-lg text-xs">
-                <p className="font-bold mb-2">调试信息:</p>
-                <p>视频数量: {videos.length}</p>
-                <p>是否有错误: {error ? '是' : '否'}</p>
-                {error && <p className="text-red-600">错误: {JSON.stringify(error)}</p>}
-              </div>
-            )}
           </main>
         </div>
 

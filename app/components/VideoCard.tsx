@@ -64,11 +64,6 @@ export default function VideoCard({
         {/* 悬停遮罩 */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
 
-        {/* 播放图标 */}
-        <svg className="relative z-10 w-16 h-16 text-white opacity-50 group-hover:opacity-70 group-hover:scale-110 transition-all duration-500" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
-        </svg>
-
         {/* 时长标签 */}
         <div className="absolute bottom-3 right-3 z-10 bg-black/80 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full font-semibold shadow-lg">
           {duration}

@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import AudioRecorder from '@/app/components/AudioRecorder';
+import { createClient } from '@/lib/supabase/client';
 
 interface Subtitle {
   id: number;
@@ -10,15 +12,45 @@ interface Subtitle {
   translation: string;
 }
 
+type VideoLoopMode = 'single' | 'loop';
+type SentenceLoopMode = 'continuous' | 'single';
+type LoopCount = 1 | 2 | 3 | -1;
+
 interface SubtitlePanelProps {
   subtitles: Subtitle[];
   currentTime?: number;
   onSeek?: (time: number) => void;
+  onPlayOriginal?: (startTime: number) => void;
+  videoLoopMode: VideoLoopMode;
+  onVideoLoopModeChange: (mode: VideoLoopMode) => void;
+  sentenceLoopMode: SentenceLoopMode;
+  onSentenceLoopModeChange: (mode: SentenceLoopMode) => void;
+  loopCount: LoopCount;
+  onLoopCountChange: (count: LoopCount) => void;
+  currentLoopIndex: number;
+  autoNextSentence: boolean;
+  onAutoNextSentenceChange: (auto: boolean) => void;
+  videoId: string;
 }
 
 type SubtitleMode = 'bilingual' | 'chinese' | 'english';
 
-export default function SubtitlePanel({ subtitles, currentTime = 0, onSeek }: SubtitlePanelProps) {
+export default function SubtitlePanel({
+  subtitles,
+  currentTime = 0,
+  onSeek,
+  onPlayOriginal,
+  videoLoopMode,
+  onVideoLoopModeChange,
+  sentenceLoopMode,
+  onSentenceLoopModeChange,
+  loopCount,
+  onLoopCountChange,
+  currentLoopIndex,
+  autoNextSentence,
+  onAutoNextSentenceChange,
+  videoId,
+}: SubtitlePanelProps) {
   // 根据当前播放时间计算激活的字幕ID
   const activeSubtitleId = React.useMemo(() => {
     const activeSubtitle = subtitles.find(
@@ -32,6 +64,51 @@ export default function SubtitlePanel({ subtitles, currentTime = 0, onSeek }: Su
   // 控制下拉菜单显示
   const [showLoopMenu, setShowLoopMenu] = useState(false);
   const [showPracticeMenu, setShowPracticeMenu] = useState(false);
+  // 口语练习模式
+  const [isPracticeMode, setIsPracticeMode] = useState(false);
+  // 存储已有的录音记录
+  const [existingRecordings, setExistingRecordings] = useState<Record<number, string>>({});
+
+  // 加载已有的录音记录
+  useEffect(() => {
+    const loadRecordings = async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('speaking_practice')
+        .select('subtitle_id, audio_url')
+        .eq('user_id', user.id)
+        .eq('video_id', videoId);
+
+      if (error) {
+        console.error('加载录音记录失败:', error);
+        return;
+      }
+
+      const recordings: Record<number, string> = {};
+      data?.forEach((record) => {
+        recordings[record.subtitle_id] = record.audio_url;
+      });
+      setExistingRecordings(recordings);
+    };
+
+    if (isPracticeMode) {
+      loadRecordings();
+    }
+  }, [isPracticeMode, videoId]);
+
+  // 处理录音完成
+  const handleRecordingComplete = (subtitleId: number, audioUrl: string) => {
+    setExistingRecordings((prev) => ({
+      ...prev,
+      [subtitleId]: audioUrl,
+    }));
+  };
 
   // 处理字幕点击，跳转到对应时间
   const handleSubtitleClick = (startTime: number) => {
@@ -78,16 +155,110 @@ export default function SubtitlePanel({ subtitles, currentTime = 0, onSeek }: Su
 
               {/* 循环播放下拉菜单 */}
               {showLoopMenu && (
-                <div className="absolute top-full right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-purple-100 py-2 z-20">
-                  <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors">
-                    单集播放
+                <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-purple-100 py-2 z-20">
+                  {/* 视频循环模式 */}
+                  <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">视频循环</div>
+                  <button
+                    onClick={() => {
+                      onVideoLoopModeChange('single');
+                      setShowLoopMenu(false);
+                    }}
+                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center justify-between ${
+                      videoLoopMode === 'single' ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-700 hover:bg-purple-50'
+                    }`}
+                  >
+                    <span>单集播放</span>
+                    {videoLoopMode === 'single' && <span className="text-purple-600">✓</span>}
                   </button>
-                  <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors">
-                    单集循环
+                  <button
+                    onClick={() => {
+                      onVideoLoopModeChange('loop');
+                      setShowLoopMenu(false);
+                    }}
+                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center justify-between ${
+                      videoLoopMode === 'loop' ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-700 hover:bg-purple-50'
+                    }`}
+                  >
+                    <span>单集循环</span>
+                    {videoLoopMode === 'loop' && <span className="text-purple-600">✓</span>}
                   </button>
-                  <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors">
-                    列表循环
+
+                  <div className="border-t border-gray-200 my-2"></div>
+
+                  {/* 句子循环模式 */}
+                  <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">句子循环</div>
+                  <button
+                    onClick={() => {
+                      onSentenceLoopModeChange('continuous');
+                      setShowLoopMenu(false);
+                    }}
+                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center justify-between ${
+                      sentenceLoopMode === 'continuous' ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-700 hover:bg-purple-50'
+                    }`}
+                  >
+                    <span>连续播放</span>
+                    {sentenceLoopMode === 'continuous' && <span className="text-purple-600">✓</span>}
                   </button>
+                  <button
+                    onClick={() => {
+                      onSentenceLoopModeChange('single');
+                    }}
+                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center justify-between ${
+                      sentenceLoopMode === 'single' ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-700 hover:bg-purple-50'
+                    }`}
+                  >
+                    <span>单句循环</span>
+                    {sentenceLoopMode === 'single' && <span className="text-purple-600">✓</span>}
+                  </button>
+
+                  {/* 循环次数选择（仅在单句循环模式下显示） */}
+                  {sentenceLoopMode === 'single' && (
+                    <>
+                      <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase mt-2">循环次数</div>
+                      {[1, 2, 3, -1].map((count) => (
+                        <button
+                          key={count}
+                          onClick={() => {
+                            onLoopCountChange(count as LoopCount);
+                            setShowLoopMenu(false);
+                          }}
+                          className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center justify-between ${
+                            loopCount === count ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-700 hover:bg-purple-50'
+                          }`}
+                        >
+                          <span>{count === -1 ? '无限循环' : `${count} 次`}</span>
+                          {loopCount === count && <span className="text-purple-600">✓</span>}
+                        </button>
+                      ))}
+
+                      <div className="border-t border-gray-200 my-2"></div>
+
+                      {/* 自动下一句开关 */}
+                      <button
+                        onClick={() => {
+                          onAutoNextSentenceChange(!autoNextSentence);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-center justify-between"
+                      >
+                        <span>自动下一句</span>
+                        <div className={`w-10 h-5 rounded-full transition-colors ${autoNextSentence ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                          <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform mt-0.5 ${autoNextSentence ? 'ml-5' : 'ml-0.5'}`}></div>
+                        </div>
+                      </button>
+
+                      {/* 当前循环次数显示 */}
+                      {loopCount !== -1 && (
+                        <div className="px-4 py-2 text-xs text-gray-500 bg-purple-50 mt-2">
+                          当前循环：第 {currentLoopIndex + 1} / {loopCount} 次
+                        </div>
+                      )}
+                      {loopCount === -1 && (
+                        <div className="px-4 py-2 text-xs text-gray-500 bg-purple-50 mt-2">
+                          当前循环：第 {currentLoopIndex + 1} 次
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -110,14 +281,15 @@ export default function SubtitlePanel({ subtitles, currentTime = 0, onSeek }: Su
               {/* 英语练习下拉菜单 */}
               {showPracticeMenu && (
                 <div className="absolute top-full right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-purple-100 py-2 z-20">
-                  <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors">
-                    听力练习
-                  </button>
-                  <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors">
-                    跟读练习
-                  </button>
-                  <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors">
-                    填空练习
+                  <button
+                    onClick={() => {
+                      setIsPracticeMode(!isPracticeMode);
+                      setShowPracticeMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-center justify-between"
+                  >
+                    <span>口语练习</span>
+                    {isPracticeMode && <span className="text-purple-600">✓</span>}
                   </button>
                 </div>
               )}
@@ -219,6 +391,21 @@ export default function SubtitlePanel({ subtitles, currentTime = 0, onSeek }: Su
                 `}>
                   {subtitle.translation}
                 </p>
+              )}
+
+              {/* 口语练习录音控件 */}
+              {isPracticeMode && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <AudioRecorder
+                    videoId={videoId}
+                    subtitleId={subtitle.id}
+                    existingAudioUrl={existingRecordings[subtitle.id]}
+                    onRecordingComplete={(audioUrl) => handleRecordingComplete(subtitle.id, audioUrl)}
+                    subtitleStartTime={subtitle.startTime}
+                    subtitleEndTime={subtitle.endTime}
+                    onPlayOriginal={onPlayOriginal ? (startTime) => onPlayOriginal(startTime) : undefined}
+                  />
+                </div>
               )}
             </div>
           );

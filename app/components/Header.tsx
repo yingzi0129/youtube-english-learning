@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface HeaderProps {
@@ -10,6 +10,36 @@ interface HeaderProps {
 export default function Header({ isAdmin = false }: HeaderProps) {
   const router = useRouter();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      // 如果滚动距离小于 10px，始终显示 header
+      if (currentScrollY < 10) {
+        setIsVisible(true);
+      } else {
+        // 向下滚动时隐藏，向上滚动时显示
+        if (currentScrollY > lastScrollY) {
+          // 向下滚动
+          setIsVisible(false);
+        } else {
+          // 向上滚动
+          setIsVisible(true);
+        }
+      }
+
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [lastScrollY]);
 
   const handleLogout = () => {
     setShowLogoutModal(false);
@@ -18,7 +48,13 @@ export default function Header({ isAdmin = false }: HeaderProps) {
 
   return (
     <>
-    <header className="bg-white/80 backdrop-blur-md border-b border-purple-100 sticky top-0 z-50 shadow-sm">
+    <header
+      className={`
+        bg-white/80 backdrop-blur-md border-b border-purple-100 sticky top-0 z-50 shadow-sm
+        transition-transform duration-300 ease-in-out
+        ${isVisible ? 'translate-y-0' : '-translate-y-full'}
+      `}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
         <div className="flex items-center justify-between">
           {/* 左侧 Logo 和标题 */}
@@ -51,11 +87,11 @@ export default function Header({ isAdmin = false }: HeaderProps) {
             <button className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full hover:shadow-lg transition-all duration-300 hover:scale-105">
               视频库
             </button>
-            <button className="hidden md:block px-4 py-2 text-gray-700 hover:bg-purple-50 rounded-full transition-colors text-sm">
+            <button
+              onClick={() => router.push('/learning-history')}
+              className="hidden md:block px-4 py-2 text-gray-700 hover:bg-purple-50 rounded-full transition-colors text-sm"
+            >
               学习记录
-            </button>
-            <button className="hidden lg:block px-4 py-2 text-gray-700 hover:bg-purple-50 rounded-full transition-colors text-sm">
-              英语卡片
             </button>
             <span className="hidden sm:inline text-sm text-gray-600">用户3291</span>
             <button
