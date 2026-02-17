@@ -12,13 +12,45 @@ interface Subtitle {
   keywords: string[];
 }
 
+type VideoLoopMode = 'single' | 'loop';
+type SentenceLoopMode = 'continuous' | 'single';
+type LoopCount = 1 | 2 | 3 | -1;
+
 interface RightPanelProps {
   subtitles: Subtitle[];
+  currentTime?: number;
+  onSeek?: (time: number) => void;
+  onPlayOriginal?: (startTime: number) => void;
+  videoLoopMode: VideoLoopMode;
+  onVideoLoopModeChange: (mode: VideoLoopMode) => void;
+  sentenceLoopMode: SentenceLoopMode;
+  onSentenceLoopModeChange: (mode: SentenceLoopMode) => void;
+  loopCount: LoopCount;
+  onLoopCountChange: (count: LoopCount) => void;
+  currentLoopIndex: number;
+  autoNextSentence: boolean;
+  onAutoNextSentenceChange: (auto: boolean) => void;
+  videoId: string;
 }
 
 type TabType = 'subtitle' | 'loop' | 'practice' | null;
 
-export default function RightPanel({ subtitles }: RightPanelProps) {
+export default function RightPanel({
+  subtitles,
+  currentTime,
+  onSeek,
+  onPlayOriginal,
+  videoLoopMode,
+  onVideoLoopModeChange,
+  sentenceLoopMode,
+  onSentenceLoopModeChange,
+  loopCount,
+  onLoopCountChange,
+  currentLoopIndex,
+  autoNextSentence,
+  onAutoNextSentenceChange,
+  videoId,
+}: RightPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>(null);
   const [showMenu, setShowMenu] = useState(false);
 
@@ -90,7 +122,24 @@ export default function RightPanel({ subtitles }: RightPanelProps) {
 
       {/* 内容区域 */}
       <div>
-        {activeTab === 'subtitle' && <SubtitlePanel subtitles={subtitles} />}
+        {activeTab === 'subtitle' && (
+          <SubtitlePanel
+            subtitles={subtitles}
+            currentTime={currentTime}
+            onSeek={onSeek}
+            onPlayOriginal={onPlayOriginal}
+            videoLoopMode={videoLoopMode}
+            onVideoLoopModeChange={onVideoLoopModeChange}
+            sentenceLoopMode={sentenceLoopMode}
+            onSentenceLoopModeChange={onSentenceLoopModeChange}
+            loopCount={loopCount}
+            onLoopCountChange={onLoopCountChange}
+            currentLoopIndex={currentLoopIndex}
+            autoNextSentence={autoNextSentence}
+            onAutoNextSentenceChange={onAutoNextSentenceChange}
+            videoId={videoId}
+          />
+        )}
 
         {activeTab === 'loop' && (
           <div className="bg-white/90 backdrop-blur-md rounded-b-3xl shadow-lg border border-t-0 border-purple-100/50 overflow-hidden">
