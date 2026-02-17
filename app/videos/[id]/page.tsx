@@ -22,6 +22,12 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
   }
 
   // 格式化视频数据
+  // 确保视频 URL 使用 HTTPS 协议，避免混合内容错误
+  let videoUrl = videoData.video_url;
+  if (videoUrl && videoUrl.startsWith('http://')) {
+    videoUrl = videoUrl.replace('http://', 'https://');
+  }
+
   const video = {
     id: videoData.id,
     title: videoData.title,
@@ -29,7 +35,7 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
     difficulty: videoData.difficulty,
     duration: `${videoData.duration_minutes}分钟`,
     description: videoData.description || '暂无描述',
-    videoUrl: videoData.video_url,
+    videoUrl: videoUrl,
     tags: videoData.tags || [],
     publishedAt: new Date(videoData.published_at).toLocaleDateString('zh-CN', {
       year: 'numeric',
