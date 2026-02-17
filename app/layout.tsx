@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import AuthGuard from "./components/AuthGuard";
 import ProgressBar from "./components/ProgressBar";
@@ -29,7 +30,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ProgressBar />
+        <Suspense fallback={null}>
+          <ProgressBar />
+        </Suspense>
         <AuthGuard>
           {children}
         </AuthGuard>
