@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
       difficulty: video.difficulty,
       date: new Date(video.published_at).toLocaleDateString('zh-CN', {
         year: 'numeric',
-        month: '1-digit',
-        day: '1-digit',
+        month: 'numeric',
+        day: 'numeric',
       }).replace(/\//g, '/'),
       videoUrl: video.video_url,
     }));
