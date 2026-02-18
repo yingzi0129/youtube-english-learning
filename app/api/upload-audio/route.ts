@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import * as qiniu from 'qiniu';
-import * as https from 'https';
-
-// 七牛云配置
-const QINIU_ACCESS_KEY = process.env.QINIU_ACCESS_KEY || '';
-const QINIU_SECRET_KEY = process.env.QINIU_SECRET_KEY || '';
-const QINIU_BUCKET = process.env.QINIU_BUCKET || '';
-const QINIU_DOMAIN = process.env.NEXT_PUBLIC_QINIU_DOMAIN || '';
+import { uploadToR2, generateAudioPath } from '@/lib/r2';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,45 +26,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '缺少必要参数' }, { status: 400 });
     }
 
-    // 生成固定的文件名（不使用时间戳，七牛云会自动覆盖同名文件）
-    const fileName = `${user.id}/${videoId}/${subtitleId}.webm`;
-
-    // 生成上传凭证（允许覆盖同名文件）
-    const mac = new qiniu.auth.digest.Mac(QINIU_ACCESS_KEY, QINIU_SECRET_KEY);
-    const options = {
-      scope: `${QINIU_BUCKET}:${fileName}`, // 指定文件名，允许覆盖
-      expires: 3600,
-    };
-    const putPolicy = new qiniu.rs.PutPolicy(options);
-    const uploadToken = putPolicy.uploadToken(mac);
+    // 生成带日期的文件路径（格式：audio/2026/02/18/userId/videoId/subtitleId.webm）
+    const fileName = generateAudioPath(user.id, videoId, subtitleId);
 
     // 将文件转换为 Buffer
     const arrayBuffer = await audioFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // 上传到七牛云
-    const config = new qiniu.conf.Config({
-      zone: qiniu.zone.Zone_z2, // 华南区域
-    });
-    const formUploader = new qiniu.form_up.FormUploader(config);
-    const putExtra = new qiniu.form_up.PutExtra();
-
-    // 使用 Promise 包装上传操作
-    const uploadResult = await new Promise<{ key: string }>((resolve, reject) => {
-      formUploader.put(uploadToken, fileName, buffer, putExtra, (err, body, info) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        if (info.statusCode === 200) {
-          resolve(body);
-        } else {
-          reject(new Error(`上传失败: ${info.statusCode}`));
-        }
-      });
-    });
-
-    const publicUrl = `${QINIU_DOMAIN}/${uploadResult.key}`;
+    // 上传到 R2
+    const publicUrl = await uploadToR2(fileName, buffer, 'audio/webm');
 
     // 保存到数据库
     const { error: dbError } = await supabase.from('speaking_practice').upsert(
@@ -97,6 +60,7 @@ export async function POST(request: NextRequest) {
       audioUrl: publicUrl,
     });
   } catch (error) {
+    console.error('上传失败:', error);
     return NextResponse.json({ error: '上传失败' }, { status: 500 });
   }
 }
