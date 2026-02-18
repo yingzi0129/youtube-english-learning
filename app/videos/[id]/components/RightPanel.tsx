@@ -31,6 +31,12 @@ interface RightPanelProps {
   autoNextSentence: boolean;
   onAutoNextSentenceChange: (auto: boolean) => void;
   videoId: string;
+  subtitleMode: 'bilingual' | 'chinese' | 'english';
+  onSubtitleModeChange: (mode: 'bilingual' | 'chinese' | 'english') => void;
+  fontSize: number;
+  themeMode: 'light' | 'dark';
+  isPracticeMode: boolean;
+  onPracticeModeChange: (enabled: boolean) => void;
 }
 
 type TabType = 'subtitle' | 'loop' | 'practice' | null;
@@ -50,6 +56,12 @@ export default function RightPanel({
   autoNextSentence,
   onAutoNextSentenceChange,
   videoId,
+  subtitleMode,
+  onSubtitleModeChange,
+  fontSize,
+  themeMode,
+  isPracticeMode,
+  onPracticeModeChange,
 }: RightPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -138,6 +150,12 @@ export default function RightPanel({
             autoNextSentence={autoNextSentence}
             onAutoNextSentenceChange={onAutoNextSentenceChange}
             videoId={videoId}
+            subtitleMode={subtitleMode}
+            onSubtitleModeChange={onSubtitleModeChange}
+            fontSize={fontSize}
+            themeMode={themeMode}
+            isPracticeMode={isPracticeMode}
+            onPracticeModeChange={onPracticeModeChange}
           />
         )}
 

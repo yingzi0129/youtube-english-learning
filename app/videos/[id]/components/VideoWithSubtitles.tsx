@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import VideoPlayer from './VideoPlayer';
 import SubtitlePanel from './SubtitlePanel';
+import MobileBottomControls from './MobileBottomControls';
 import { updateWatchProgress, getWatchProgress } from '@/lib/watchProgress';
 
 interface VideoWithSubtitlesProps {
@@ -21,6 +22,8 @@ interface VideoWithSubtitlesProps {
 export type VideoLoopMode = 'single' | 'loop'; // 单集播放 / 单集循环
 export type SentenceLoopMode = 'continuous' | 'single'; // 连续播放 / 单句循环
 export type LoopCount = 1 | 2 | 3 | -1; // 循环次数，-1 表示无限循环
+export type SubtitleMode = 'bilingual' | 'chinese' | 'english'; // 字幕显示模式
+export type ThemeMode = 'light' | 'dark'; // 主题模式
 
 export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSubtitlesProps) {
   const params = useParams();
@@ -45,6 +48,13 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
   const [autoNextSentence, setAutoNextSentence] = useState(true);
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState<number | null>(null);
   const sentenceLoopTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 移动端控制状态
+  const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>('bilingual');
+  const [fontSize, setFontSize] = useState(16);
+  const [themeMode, setThemeMode] = useState<ThemeMode>('light');
+  const [isPracticeMode, setIsPracticeMode] = useState(false);
+  const videoPlayerRef = useRef<{ togglePlayPause: () => void } | null>(null);
 
   // 获取当前播放的句子索引
   useEffect(() => {
@@ -245,40 +255,79 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
     handleSeek(startTime, true);
   };
 
+  // 处理播放/暂停切换（移动端控制栏使用）
+  const handlePlayPause = () => {
+    if (videoPlayerRef.current) {
+      videoPlayerRef.current.togglePlayPause();
+    }
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
-      {/* 左侧：视频播放器 */}
-      <div className="lg:col-span-2">
-        <VideoPlayer
-          videoUrl={videoUrl}
-          onTimeUpdate={handleTimeUpdate}
-          onDurationChange={handleDurationChange}
-          onPlayStateChange={handlePlayStateChange}
-          onPause={handlePause}
-          seekToTime={seekToTime}
-          autoPlayOnSeek={autoPlayOnSeek}
-        />
+    <>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 pb-24 lg:pb-0">
+        {/* 左侧：视频播放器 */}
+        <div className="lg:col-span-2">
+          <VideoPlayer
+            ref={videoPlayerRef}
+            videoUrl={videoUrl}
+            onTimeUpdate={handleTimeUpdate}
+            onDurationChange={handleDurationChange}
+            onPlayStateChange={handlePlayStateChange}
+            onPause={handlePause}
+            seekToTime={seekToTime}
+            autoPlayOnSeek={autoPlayOnSeek}
+          />
+        </div>
+
+        {/* 右侧：字幕面板 */}
+        <div className="lg:col-span-1">
+          <SubtitlePanel
+            subtitles={subtitles}
+            currentTime={currentTime}
+            onSeek={handleSeek}
+            onPlayOriginal={handlePlayOriginal}
+            videoLoopMode={videoLoopMode}
+            onVideoLoopModeChange={setVideoLoopMode}
+            sentenceLoopMode={sentenceLoopMode}
+            onSentenceLoopModeChange={setSentenceLoopMode}
+            loopCount={loopCount}
+            onLoopCountChange={setLoopCount}
+            currentLoopIndex={currentLoopIndex}
+            autoNextSentence={autoNextSentence}
+            onAutoNextSentenceChange={setAutoNextSentence}
+            videoId={videoId}
+            subtitleMode={subtitleMode}
+            onSubtitleModeChange={setSubtitleMode}
+            fontSize={fontSize}
+            themeMode={themeMode}
+            isPracticeMode={isPracticeMode}
+            onPracticeModeChange={setIsPracticeMode}
+          />
+        </div>
       </div>
 
-      {/* 右侧：字幕面板 */}
-      <div className="lg:col-span-1">
-        <SubtitlePanel
-          subtitles={subtitles}
-          currentTime={currentTime}
-          onSeek={handleSeek}
-          onPlayOriginal={handlePlayOriginal}
-          videoLoopMode={videoLoopMode}
-          onVideoLoopModeChange={setVideoLoopMode}
-          sentenceLoopMode={sentenceLoopMode}
-          onSentenceLoopModeChange={setSentenceLoopMode}
-          loopCount={loopCount}
-          onLoopCountChange={setLoopCount}
-          currentLoopIndex={currentLoopIndex}
-          autoNextSentence={autoNextSentence}
-          onAutoNextSentenceChange={setAutoNextSentence}
-          videoId={videoId}
-        />
-      </div>
-    </div>
+      {/* 移动端底部控制栏 */}
+      <MobileBottomControls
+        isPlaying={isPlaying}
+        onPlayPause={handlePlayPause}
+        subtitleMode={subtitleMode}
+        onSubtitleModeChange={setSubtitleMode}
+        fontSize={fontSize}
+        onFontSizeChange={setFontSize}
+        videoLoopMode={videoLoopMode}
+        onVideoLoopModeChange={setVideoLoopMode}
+        sentenceLoopMode={sentenceLoopMode}
+        onSentenceLoopModeChange={setSentenceLoopMode}
+        loopCount={loopCount}
+        onLoopCountChange={setLoopCount}
+        autoNextSentence={autoNextSentence}
+        onAutoNextSentenceChange={setAutoNextSentence}
+        currentLoopIndex={currentLoopIndex}
+        themeMode={themeMode}
+        onThemeModeChange={setThemeMode}
+        isPracticeMode={isPracticeMode}
+        onPracticeModeChange={setIsPracticeMode}
+      />
+    </>
   );
 }

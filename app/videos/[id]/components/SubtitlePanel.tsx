@@ -15,6 +15,8 @@ interface Subtitle {
 type VideoLoopMode = 'single' | 'loop';
 type SentenceLoopMode = 'continuous' | 'single';
 type LoopCount = 1 | 2 | 3 | -1;
+type SubtitleMode = 'bilingual' | 'chinese' | 'english';
+type ThemeMode = 'light' | 'dark';
 
 interface SubtitlePanelProps {
   subtitles: Subtitle[];
@@ -31,9 +33,13 @@ interface SubtitlePanelProps {
   autoNextSentence: boolean;
   onAutoNextSentenceChange: (auto: boolean) => void;
   videoId: string;
+  subtitleMode: SubtitleMode;
+  onSubtitleModeChange: (mode: SubtitleMode) => void;
+  fontSize: number;
+  themeMode: ThemeMode;
+  isPracticeMode: boolean;
+  onPracticeModeChange: (enabled: boolean) => void;
 }
-
-type SubtitleMode = 'bilingual' | 'chinese' | 'english';
 
 export default function SubtitlePanel({
   subtitles,
@@ -50,6 +56,12 @@ export default function SubtitlePanel({
   autoNextSentence,
   onAutoNextSentenceChange,
   videoId,
+  subtitleMode,
+  onSubtitleModeChange,
+  fontSize,
+  themeMode,
+  isPracticeMode,
+  onPracticeModeChange,
 }: SubtitlePanelProps) {
   // 根据当前播放时间计算激活的字幕ID
   const activeSubtitleId = React.useMemo(() => {
@@ -59,13 +71,9 @@ export default function SubtitlePanel({
     return activeSubtitle?.id || null;
   }, [currentTime, subtitles]);
 
-  // 字幕显示模式
-  const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>('bilingual');
   // 控制下拉菜单显示
   const [showLoopMenu, setShowLoopMenu] = useState(false);
   const [showPracticeMenu, setShowPracticeMenu] = useState(false);
-  // 口语练习模式
-  const [isPracticeMode, setIsPracticeMode] = useState(false);
   // 存储已有的录音记录
   const [existingRecordings, setExistingRecordings] = useState<Record<number, string>>({});
 
@@ -282,7 +290,7 @@ export default function SubtitlePanel({
                 <div className="absolute top-full right-0 mt-2 w-36 lg:w-40 bg-white rounded-xl shadow-lg border border-purple-100 py-2 z-20">
                   <button
                     onClick={() => {
-                      setIsPracticeMode(!isPracticeMode);
+                      onPracticeModeChange(!isPracticeMode);
                       setShowPracticeMenu(false);
                     }}
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-center justify-between"
@@ -296,10 +304,10 @@ export default function SubtitlePanel({
           </div>
         </div>
 
-        {/* 语言切换按钮 */}
-        <div className="flex items-center gap-1.5 lg:gap-2">
+        {/* 语言切换按钮 - 只在电脑端显示 */}
+        <div className="hidden lg:flex items-center gap-1.5 lg:gap-2">
           <button
-            onClick={() => setSubtitleMode('bilingual')}
+            onClick={() => onSubtitleModeChange('bilingual')}
             className={`px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-lg text-xs lg:text-sm font-medium transition-all ${
               subtitleMode === 'bilingual'
                 ? 'bg-purple-600 text-white shadow-md'
@@ -309,7 +317,7 @@ export default function SubtitlePanel({
             双语
           </button>
           <button
-            onClick={() => setSubtitleMode('chinese')}
+            onClick={() => onSubtitleModeChange('chinese')}
             className={`px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-lg text-xs lg:text-sm font-medium transition-all ${
               subtitleMode === 'chinese'
                 ? 'bg-purple-600 text-white shadow-md'
@@ -319,7 +327,7 @@ export default function SubtitlePanel({
             中文
           </button>
           <button
-            onClick={() => setSubtitleMode('english')}
+            onClick={() => onSubtitleModeChange('english')}
             className={`px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-lg text-xs lg:text-sm font-medium transition-all ${
               subtitleMode === 'english'
                 ? 'bg-purple-600 text-white shadow-md'
@@ -332,7 +340,9 @@ export default function SubtitlePanel({
       </div>
 
       {/* 字幕列表 */}
-      <div className="h-[400px] lg:h-[600px] overflow-y-auto p-3 lg:p-4 space-y-2 lg:space-y-3">
+      <div className={`h-[400px] lg:h-[600px] overflow-y-auto p-3 lg:p-4 space-y-2 lg:space-y-3 ${
+        themeMode === 'dark' ? 'bg-gray-900' : ''
+      }`}>
         {subtitles.map((subtitle) => {
           const isActive = subtitle.id === activeSubtitleId;
 
@@ -343,7 +353,11 @@ export default function SubtitlePanel({
                 p-3 lg:p-4 rounded-xl lg:rounded-2xl border-2 transition-all duration-300 cursor-pointer
                 ${
                   isActive
-                    ? 'bg-yellow-50 border-yellow-400 shadow-md'
+                    ? themeMode === 'dark'
+                      ? 'bg-yellow-900/30 border-yellow-600 shadow-md'
+                      : 'bg-yellow-50 border-yellow-400 shadow-md'
+                    : themeMode === 'dark'
+                    ? 'bg-gray-800 border-gray-700 hover:border-purple-500 hover:shadow-sm'
                     : 'bg-white border-gray-200 hover:border-purple-300 hover:shadow-sm'
                 }
               `}
@@ -354,13 +368,22 @@ export default function SubtitlePanel({
                 <span
                   className={`
                     text-xs font-bold px-2 py-0.5 lg:py-1 rounded-full
-                    ${isActive ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-100 text-gray-600'}
+                    ${isActive
+                      ? themeMode === 'dark'
+                        ? 'bg-yellow-900 text-yellow-300'
+                        : 'bg-yellow-200 text-yellow-800'
+                      : themeMode === 'dark'
+                      ? 'bg-gray-700 text-gray-300'
+                      : 'bg-gray-100 text-gray-600'
+                    }
                   `}
                 >
                   {formatTime(subtitle.startTime)}
                 </span>
                 {isActive && (
-                  <span className="flex items-center gap-1 text-xs text-yellow-700 font-semibold">
+                  <span className={`flex items-center gap-1 text-xs font-semibold ${
+                    themeMode === 'dark' ? 'text-yellow-400' : 'text-yellow-700'
+                  }`}>
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                     </svg>
@@ -373,10 +396,18 @@ export default function SubtitlePanel({
               {(subtitleMode === 'bilingual' || subtitleMode === 'english') && (
                 <p
                   className={`
-                    text-sm lg:text-lg leading-relaxed
+                    leading-relaxed
                     ${subtitleMode === 'bilingual' ? 'mb-2' : ''}
-                    ${isActive ? 'text-gray-900 font-semibold' : 'text-gray-700'}
+                    ${isActive
+                      ? themeMode === 'dark'
+                        ? 'text-white font-semibold'
+                        : 'text-gray-900 font-semibold'
+                      : themeMode === 'dark'
+                      ? 'text-gray-300'
+                      : 'text-gray-700'
+                    }
                   `}
+                  style={{ fontSize: `${fontSize}px` }}
                 >
                   {subtitle.text}
                 </p>
@@ -384,17 +415,29 @@ export default function SubtitlePanel({
 
               {/* 中文翻译 */}
               {(subtitleMode === 'bilingual' || subtitleMode === 'chinese') && (
-                <p className={`
-                  text-xs lg:text-sm leading-relaxed
-                  ${isActive ? 'text-gray-700' : 'text-gray-600'}
-                `}>
+                <p
+                  className={`
+                    leading-relaxed
+                    ${isActive
+                      ? themeMode === 'dark'
+                        ? 'text-gray-300'
+                        : 'text-gray-700'
+                      : themeMode === 'dark'
+                      ? 'text-gray-400'
+                      : 'text-gray-600'
+                    }
+                  `}
+                  style={{ fontSize: `${fontSize - 2}px` }}
+                >
                   {subtitle.translation}
                 </p>
               )}
 
               {/* 口语练习录音控件 */}
               {isPracticeMode && (
-                <div className="mt-2 lg:mt-3 pt-2 lg:pt-3 border-t border-gray-200">
+                <div className={`mt-2 lg:mt-3 pt-2 lg:pt-3 ${
+                  themeMode === 'dark' ? 'border-gray-700' : 'border-gray-200'
+                } border-t`}>
                   <AudioRecorder
                     videoId={videoId}
                     subtitleId={subtitle.id}

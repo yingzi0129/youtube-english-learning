@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 
 interface VideoPlayerProps {
   videoUrl: string;
@@ -12,7 +12,11 @@ interface VideoPlayerProps {
   autoPlayOnSeek?: boolean;
 }
 
-export default function VideoPlayer({ videoUrl, onTimeUpdate, onDurationChange, onPlayStateChange, onPause, seekToTime, autoPlayOnSeek = false }: VideoPlayerProps) {
+export interface VideoPlayerRef {
+  togglePlayPause: () => void;
+}
+
+const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({ videoUrl, onTimeUpdate, onDurationChange, onPlayStateChange, onPause, seekToTime, autoPlayOnSeek = false }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,6 +24,19 @@ export default function VideoPlayer({ videoUrl, onTimeUpdate, onDurationChange, 
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
 
   const speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
+  // 暴露播放暂停控制方法给父组件
+  useImperativeHandle(ref, () => ({
+    togglePlayPause: () => {
+      if (videoRef.current) {
+        if (videoRef.current.paused) {
+          videoRef.current.play();
+        } else {
+          videoRef.current.pause();
+        }
+      }
+    },
+  }));
 
   // 监听视频时间更新
   const handleTimeUpdate = () => {
@@ -247,4 +264,8 @@ export default function VideoPlayer({ videoUrl, onTimeUpdate, onDurationChange, 
       </div>
     </div>
   );
-}
+});
+
+VideoPlayer.displayName = 'VideoPlayer';
+
+export default VideoPlayer;
