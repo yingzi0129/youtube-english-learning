@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
@@ -17,6 +17,9 @@ interface Subtitle {
   end_time: number;
   text_en: string;
   text_zh: string;
+  seek_offset?: number;
+  seek_offset_confirmed_value?: number | null;
+  seek_offset_confirmed_at?: string | null;
 }
 
 export default function SubtitlesManagementPage() {
@@ -28,6 +31,10 @@ export default function SubtitlesManagementPage() {
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savingSubtitleId, setSavingSubtitleId] = useState<string | null>(null);
+  const [playError, setPlayError] = useState<string>('');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const stopTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     fetchVideos();
@@ -41,6 +48,19 @@ export default function SubtitlesManagementPage() {
       setSubtitles([]);
       setLoading(false);
     }
+  }, [videoId]);
+
+  // Ensure no audio keeps playing when switching videos / leaving the page.
+  useEffect(() => {
+    return () => {
+      if (stopTimerRef.current) {
+        window.clearTimeout(stopTimerRef.current);
+        stopTimerRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.pause();
+      }
+    };
   }, [videoId]);
 
   const fetchVideos = async () => {
@@ -79,11 +99,140 @@ export default function SubtitlesManagementPage() {
         .eq('video_id', id)
         .order('sequence', { ascending: true });
 
-      setSubtitles(subtitlesData || []);
+      setSubtitles(
+        (subtitlesData || []).map((s: any) => ({
+          ...s,
+          start_time: Number(s.start_time),
+          end_time: Number(s.end_time),
+          seek_offset: Number.isFinite(Number(s.seek_offset)) ? Number(s.seek_offset) : 0,
+          seek_offset_confirmed_value: Number.isFinite(Number(s.seek_offset_confirmed_value))
+            ? Number(s.seek_offset_confirmed_value)
+            : null,
+          seek_offset_confirmed_at: s.seek_offset_confirmed_at ?? null,
+        }))
+      );
     } catch (err) {
       console.error('获取数据失败:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateSeekOffsetLocal = (subtitleId: string, nextOffset: number) => {
+    setSubtitles((prev) =>
+      prev.map((s) =>
+        s.id === subtitleId
+          ? { ...s, seek_offset: Math.round(nextOffset * 1000) / 1000 }
+          : s
+      )
+    );
+  };
+
+  const isSeekOffsetConfirmed = (s: Subtitle) => {
+    const v = s.seek_offset_confirmed_value;
+    const cur = s.seek_offset ?? 0;
+    if (v === null || v === undefined) return false;
+    return Math.abs(Number(v) - Number(cur)) < 0.0005;
+  };
+
+  const handleSaveSeekOffset = async (subtitleId: string) => {
+    const target = subtitles.find((s) => s.id === subtitleId);
+    if (!target) return;
+
+    setSavingSubtitleId(subtitleId);
+    try {
+      const supabase = createClient();
+      const nowIso = new Date().toISOString();
+      const cur = target.seek_offset ?? 0;
+      const { error } = await supabase
+        .from('subtitles')
+        .update({
+          seek_offset: cur,
+          // Saving implies "confirmed" per your workflow.
+          seek_offset_confirmed_value: cur,
+          seek_offset_confirmed_at: nowIso,
+        })
+        .eq('id', subtitleId);
+
+      if (error) throw error;
+
+      // Locally mark as confirmed.
+      setSubtitles((prev) =>
+        prev.map((s) =>
+          s.id === subtitleId
+            ? { ...s, seek_offset_confirmed_value: cur, seek_offset_confirmed_at: nowIso }
+            : s
+        )
+      );
+    } catch (err: any) {
+      console.error('保存点击偏移失败:', err);
+      alert(err?.message || '保存失败，请重试');
+    } finally {
+      setSavingSubtitleId(null);
+    }
+  };
+
+  const stopAudition = () => {
+    if (stopTimerRef.current) {
+      window.clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.pause();
+    }
+  };
+
+  const handleAudition = async (subtitle: Subtitle) => {
+    setPlayError('');
+    const video = videoRef.current;
+    if (!video) {
+      setPlayError('试听失败：未找到视频资源，请确认该视频存在 video_url。');
+      return;
+    }
+
+    stopAudition();
+
+    const offset = Number.isFinite(Number(subtitle.seek_offset)) ? Number(subtitle.seek_offset) : 0;
+    const start = Number.isFinite(Number(subtitle.start_time)) ? Number(subtitle.start_time) : 0;
+    const end = Number.isFinite(Number(subtitle.end_time)) ? Number(subtitle.end_time) : start + 5;
+
+    // Play from (start + offset), but clamp to a safe range.
+    const boundaryPad = 0.03;
+    const target = Math.max(0, Math.min(start + offset, Math.max(0, end - boundaryPad)));
+    const stopAt = Math.min(end, target + 4); // enough to verify the sentence start
+
+    try {
+      if (video.readyState < 1) {
+        await new Promise<void>((resolve) => {
+          const onLoadedMetadata = () => {
+            video.removeEventListener('loadedmetadata', onLoadedMetadata);
+            resolve();
+          };
+          video.addEventListener('loadedmetadata', onLoadedMetadata);
+          // In case the browser starts loading lazily, touching `load()` helps some environments.
+          video.load();
+        });
+      }
+
+      await new Promise<void>((resolve) => {
+        const onSeeked = () => {
+          video.removeEventListener('seeked', onSeeked);
+          resolve();
+        };
+        video.addEventListener('seeked', onSeeked);
+        video.currentTime = target;
+      });
+
+      const p = video.play();
+      if (p) await p;
+
+      stopTimerRef.current = window.setTimeout(() => {
+        if (!videoRef.current) return;
+        videoRef.current.pause();
+      }, Math.max(300, (stopAt - target) * 1000));
+    } catch (err: any) {
+      console.error('试听失败:', err);
+      setPlayError('试听失败：请检查视频是否可访问（R2 跨域/范围请求）或浏览器是否阻止播放。');
     }
   };
 
@@ -156,6 +305,27 @@ export default function SubtitlesManagementPage() {
                 上传字幕
               </Link>
             </div>
+
+            {/* Hidden video element for auditioning sentence audio */}
+            {selectedVideo.video_url && (
+              <video
+                ref={videoRef}
+                className="absolute w-0 h-0 opacity-0 pointer-events-none"
+                preload="auto"
+                playsInline
+                src={
+                  typeof selectedVideo.video_url === 'string' && selectedVideo.video_url.startsWith('http://')
+                    ? selectedVideo.video_url.replace('http://', 'https://')
+                    : selectedVideo.video_url
+                }
+              />
+            )}
+
+            {playError && (
+              <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-sm text-yellow-800">{playError}</p>
+              </div>
+            )}
           </div>
 
           {/* 字幕表格 */}
@@ -170,6 +340,12 @@ export default function SubtitlesManagementPage() {
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         时间范围
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        点击偏移
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        是否可用
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         英文字幕
@@ -191,6 +367,20 @@ export default function SubtitlesManagementPage() {
                         <td className="px-6 py-4 text-sm text-gray-900">
                           {subtitle.start_time}s - {subtitle.end_time}s
                         </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {(subtitle.seek_offset ?? 0).toFixed(1)}s
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          {isSeekOffsetConfirmed(subtitle) ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              已确认
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-50 text-gray-600 border border-gray-200">
+                              未确认
+                            </span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
                           {subtitle.text_en || '-'}
                         </td>
@@ -198,12 +388,76 @@ export default function SubtitlesManagementPage() {
                           {subtitle.text_zh || '-'}
                         </td>
                         <td className="px-6 py-4 text-right text-sm font-medium">
-                          <Link
-                            href={`/admin/subtitles/${subtitle.id}/edit`}
-                            className="text-purple-600 hover:text-purple-900"
-                          >
-                            编辑
-                          </Link>
+                          <div className="flex flex-wrap gap-2 justify-end">
+                            <button
+                              type="button"
+                              onClick={() => handleAudition(subtitle)}
+                              className="px-3 py-1.5 text-xs rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-800"
+                              title="试听该句（按当前偏移播放）"
+                            >
+                              试听
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => updateSeekOffsetLocal(subtitle.id, (subtitle.seek_offset ?? 0) - 0.1)}
+                              className="px-2.5 py-1.5 text-xs rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-800"
+                              title="提前 0.1 秒"
+                            >
+                              -0.1s
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateSeekOffsetLocal(subtitle.id, (subtitle.seek_offset ?? 0) + 0.1)}
+                              className="px-2.5 py-1.5 text-xs rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-800"
+                              title="延后 0.1 秒"
+                            >
+                              +0.1s
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => updateSeekOffsetLocal(subtitle.id, -0.5)}
+                              className="px-2.5 py-1.5 text-xs rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-800"
+                              title="常用预设：回退 0.5 秒"
+                            >
+                              -0.5s
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateSeekOffsetLocal(subtitle.id, -1.0)}
+                              className="px-2.5 py-1.5 text-xs rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-800"
+                              title="常用预设：回退 1.0 秒"
+                            >
+                              -1.0s
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateSeekOffsetLocal(subtitle.id, 0)}
+                              className="px-2.5 py-1.5 text-xs rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-800"
+                              title="重置为 0"
+                            >
+                              重置
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSaveSeekOffset(subtitle.id)}
+                              className="px-3 py-1.5 text-xs rounded-lg bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50"
+                              disabled={savingSubtitleId === subtitle.id}
+                              title="保存该句点击偏移"
+                            >
+                              {savingSubtitleId === subtitle.id ? '保存中…' : '保存'}
+                            </button>
+
+                            <Link
+                              href={`/admin/subtitles/${subtitle.id}/edit`}
+                              className="px-3 py-1.5 text-xs rounded-lg text-purple-700 border border-purple-200 bg-purple-50 hover:bg-purple-100"
+                              title="进入详情页编辑"
+                            >
+                              详情
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     ))}

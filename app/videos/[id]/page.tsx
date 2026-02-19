@@ -58,12 +58,17 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
     endTime: sub.end_time,
     text: sub.text_en || '',
     translation: sub.text_zh || '',
+    // Optional: manual seek offset (seconds). Negative means seek earlier.
+    seekOffset: Number.isFinite(Number(sub.seek_offset)) ? Number(sub.seek_offset) : 0,
   }));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
       {/* 顶部导航栏 */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-purple-100 sticky top-0 z-50 shadow-sm">
+      <header
+        data-video-page-header="true"
+        className="bg-white/80 backdrop-blur-md border-b border-purple-100 sticky top-0 z-50 shadow-sm"
+      >
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-4">
             <a

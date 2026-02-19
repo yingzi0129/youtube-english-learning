@@ -164,7 +164,7 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({ videoUrl, on
   };
 
   return (
-    <div className="bg-white rounded-3xl shadow-lg overflow-hidden border border-purple-100/50">
+    <div className="bg-white rounded-2xl lg:rounded-3xl shadow-md lg:shadow-lg overflow-hidden border border-purple-100/50">
       {/* 视频播放器容器 */}
       <div className="relative aspect-video bg-black">
         {isLoading && (
@@ -200,8 +200,8 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({ videoUrl, on
         </video>
       </div>
 
-      {/* 自定义控制面板 */}
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-4 lg:px-6 py-3 lg:py-4 border-t border-purple-100">
+      {/* 自定义控制面板（移动端隐藏，避免和底部控制栏重复） */}
+      <div className="hidden lg:block bg-gradient-to-r from-purple-50 to-pink-50 px-4 lg:px-6 py-3 lg:py-4 border-t border-purple-100">
         <div className="flex items-center justify-between gap-3 lg:gap-4">
           {/* 左侧：快退/快进按钮 */}
           <div className="flex items-center gap-1.5 lg:gap-2">

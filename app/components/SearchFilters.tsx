@@ -53,7 +53,7 @@ export default function SearchFilters({
       </div>
 
       {/* 筛选器网格 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 relative z-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* 视频难度 */}
         <div>
           <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">

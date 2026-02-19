@@ -10,7 +10,7 @@ interface AudioRecorderProps {
   existingAudioUrl?: string;
   subtitleStartTime: number;
   subtitleEndTime: number;
-  onPlayOriginal?: (startTime: number) => void;
+  onPlayOriginal?: () => void;
 }
 
 export default function AudioRecorder({
@@ -326,7 +326,7 @@ export default function AudioRecorder({
       {/* 播放原文按钮 */}
       {!isRecording && onPlayOriginal && (
         <button
-          onClick={() => onPlayOriginal(subtitleStartTime)}
+          onClick={() => onPlayOriginal()}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg transition-colors"
           title="播放原文"
         >

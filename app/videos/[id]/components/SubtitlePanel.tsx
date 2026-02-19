@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AudioRecorder from '@/app/components/AudioRecorder';
 import { createClient } from '@/lib/supabase/client';
 
@@ -10,6 +10,7 @@ interface Subtitle {
   endTime: number;
   text: string;
   translation: string;
+  seekOffset?: number;
 }
 
 type VideoLoopMode = 'single' | 'loop';
@@ -21,8 +22,10 @@ type ThemeMode = 'light' | 'dark';
 interface SubtitlePanelProps {
   subtitles: Subtitle[];
   currentTime?: number;
-  onSeek?: (time: number) => void;
-  onPlayOriginal?: (startTime: number) => void;
+  // New: seek by subtitle id (supports smart backtracking in parent).
+  onSeekToSubtitle?: (subtitleId: number) => void;
+  onSeek?: (time: number) => void; // fallback
+  onPlayOriginal?: (subtitleId: number) => void;
   videoLoopMode: VideoLoopMode;
   onVideoLoopModeChange: (mode: VideoLoopMode) => void;
   sentenceLoopMode: SentenceLoopMode;
@@ -44,6 +47,7 @@ interface SubtitlePanelProps {
 export default function SubtitlePanel({
   subtitles,
   currentTime = 0,
+  onSeekToSubtitle,
   onSeek,
   onPlayOriginal,
   videoLoopMode,
@@ -63,13 +67,83 @@ export default function SubtitlePanel({
   isPracticeMode,
   onPracticeModeChange,
 }: SubtitlePanelProps) {
+  const subtitleListRef = useRef<HTMLDivElement>(null);
+  const [pinnedSubtitleId, setPinnedSubtitleId] = useState<number | null>(null);
+
   // 根据当前播放时间计算激活的字幕ID
-  const activeSubtitleId = React.useMemo(() => {
+  const activeSubtitleIdByTime = React.useMemo(() => {
     const activeSubtitle = subtitles.find(
       (sub) => currentTime >= sub.startTime && currentTime < sub.endTime
     );
     return activeSubtitle?.id || null;
   }, [currentTime, subtitles]);
+
+  // When we seek slightly earlier than a subtitle's start (smart backtracking),
+  // keep the clicked subtitle highlighted until playback reaches its start time.
+  const pinnedStartTime = React.useMemo(() => {
+    if (pinnedSubtitleId == null) return null;
+    return subtitles.find((s) => s.id === pinnedSubtitleId)?.startTime ?? null;
+  }, [pinnedSubtitleId, subtitles]);
+
+  const activeSubtitleId =
+    pinnedSubtitleId != null &&
+    pinnedStartTime != null &&
+    currentTime < pinnedStartTime &&
+    pinnedStartTime - currentTime <= 3
+      ? pinnedSubtitleId
+      : activeSubtitleIdByTime;
+
+  useEffect(() => {
+    if (pinnedSubtitleId == null || pinnedStartTime == null) return;
+    if (currentTime >= pinnedStartTime - 0.01) {
+      setPinnedSubtitleId(null);
+    }
+  }, [currentTime, pinnedSubtitleId, pinnedStartTime]);
+
+  // 自动滚动字幕列表：当激活字幕靠近底部/不在可视区域时，将其滚动到列表顶部位置
+  useEffect(() => {
+    if (activeSubtitleId == null) return;
+
+    const container = subtitleListRef.current;
+    if (!container) return;
+
+    const el = container.querySelector<HTMLElement>(`[data-subtitle-id="${activeSubtitleId}"]`);
+    if (!el) return;
+
+    const elRect = el.getBoundingClientRect();
+
+    const computed = window.getComputedStyle(container);
+    const paddingTop = Number.parseFloat(computed.paddingTop || '0') || 0;
+    const overflowY = computed.overflowY;
+    const isScrollable =
+      (overflowY === 'auto' || overflowY === 'scroll') &&
+      container.scrollHeight > container.clientHeight + 1;
+
+    if (isScrollable) {
+      const containerRect = container.getBoundingClientRect();
+
+      // When active subtitle enters the lower part of the container viewport (or is above), snap it to the top.
+      const topThreshold = containerRect.top + paddingTop;
+      const lowerThreshold = containerRect.top + containerRect.height * 0.65;
+
+      if (elRect.top < topThreshold || elRect.top > lowerThreshold) {
+        const targetTop = container.scrollTop + (elRect.top - containerRect.top) - paddingTop;
+        container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      }
+    } else {
+      // Mobile layout: list is not scrollable; scroll the page instead.
+      // Keep the active subtitle close to the top, below the sticky header.
+      const stickyVideo = document.querySelector<HTMLElement>('[data-sticky-video="true"]');
+      const stickyBottom = stickyVideo?.getBoundingClientRect().bottom;
+      const topOffset = (typeof stickyBottom === 'number' ? stickyBottom : 88) + 12;
+      const lowerThreshold = window.innerHeight * 0.75;
+
+      if (elRect.top < topOffset || elRect.top > lowerThreshold) {
+        const targetTop = window.scrollY + elRect.top - topOffset;
+        window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+      }
+    }
+  }, [activeSubtitleId]);
 
   // 控制下拉菜单显示
   const [showLoopMenu, setShowLoopMenu] = useState(false);
@@ -118,10 +192,13 @@ export default function SubtitlePanel({
   };
 
   // 处理字幕点击，跳转到对应时间
-  const handleSubtitleClick = (startTime: number) => {
-    if (onSeek) {
-      onSeek(startTime);
+  const handleSubtitleClick = (subtitleId: number, startTime: number) => {
+    setPinnedSubtitleId(subtitleId);
+    if (onSeekToSubtitle) {
+      onSeekToSubtitle(subtitleId);
+      return;
     }
+    if (onSeek) onSeek(startTime);
   };
 
   // 格式化时间显示（秒转为 mm:ss 格式）
@@ -134,7 +211,7 @@ export default function SubtitlePanel({
   return (
     <div className="bg-white/90 backdrop-blur-md rounded-3xl shadow-lg border border-purple-100/50 overflow-hidden lg:sticky lg:top-24">
       {/* 标题和功能图标 */}
-      <div className="px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
+      <div className="hidden lg:block px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
         <div className="flex items-center justify-between mb-2 lg:mb-3">
           <h2 className="text-base lg:text-lg font-bold text-gray-900 flex items-center gap-2">
             <svg className="w-4 h-4 lg:w-5 lg:h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -340,15 +417,19 @@ export default function SubtitlePanel({
       </div>
 
       {/* 字幕列表 */}
-      <div className={`h-[400px] lg:h-[600px] overflow-y-auto p-3 lg:p-4 space-y-2 lg:space-y-3 ${
+      <div
+        ref={subtitleListRef}
+        className={`p-3 lg:p-4 space-y-2 lg:space-y-3 lg:h-[600px] lg:overflow-y-auto ${
         themeMode === 'dark' ? 'bg-gray-900' : ''
-      }`}>
+      }`}
+      >
         {subtitles.map((subtitle) => {
           const isActive = subtitle.id === activeSubtitleId;
 
           return (
             <div
               key={subtitle.id}
+              data-subtitle-id={subtitle.id}
               className={`
                 p-3 lg:p-4 rounded-xl lg:rounded-2xl border-2 transition-all duration-300 cursor-pointer
                 ${
@@ -361,7 +442,7 @@ export default function SubtitlePanel({
                     : 'bg-white border-gray-200 hover:border-purple-300 hover:shadow-sm'
                 }
               `}
-              onClick={() => handleSubtitleClick(subtitle.startTime)}
+              onClick={() => handleSubtitleClick(subtitle.id, subtitle.startTime)}
             >
               {/* 时间戳 */}
               <div className="flex items-center gap-2 mb-2">
@@ -397,11 +478,12 @@ export default function SubtitlePanel({
                 <p
                   className={`
                     leading-relaxed
+                    font-semibold
                     ${subtitleMode === 'bilingual' ? 'mb-2' : ''}
                     ${isActive
                       ? themeMode === 'dark'
-                        ? 'text-white font-semibold'
-                        : 'text-gray-900 font-semibold'
+                        ? 'text-white'
+                        : 'text-gray-900'
                       : themeMode === 'dark'
                       ? 'text-gray-300'
                       : 'text-gray-700'
@@ -418,6 +500,7 @@ export default function SubtitlePanel({
                 <p
                   className={`
                     leading-relaxed
+                    ${subtitleMode === 'chinese' ? 'font-semibold' : ''}
                     ${isActive
                       ? themeMode === 'dark'
                         ? 'text-gray-300'
@@ -427,7 +510,7 @@ export default function SubtitlePanel({
                       : 'text-gray-600'
                     }
                   `}
-                  style={{ fontSize: `${fontSize - 2}px` }}
+                  style={{ fontSize: `${subtitleMode === 'bilingual' ? fontSize : fontSize - 2}px` }}
                 >
                   {subtitle.translation}
                 </p>
@@ -445,7 +528,7 @@ export default function SubtitlePanel({
                     onRecordingComplete={(audioUrl) => handleRecordingComplete(subtitle.id, audioUrl)}
                     subtitleStartTime={subtitle.startTime}
                     subtitleEndTime={subtitle.endTime}
-                    onPlayOriginal={onPlayOriginal ? (startTime) => onPlayOriginal(startTime) : undefined}
+                    onPlayOriginal={onPlayOriginal ? () => onPlayOriginal(subtitle.id) : undefined}
                   />
                 </div>
               )}

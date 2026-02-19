@@ -20,7 +20,7 @@ interface RightPanelProps {
   subtitles: Subtitle[];
   currentTime?: number;
   onSeek?: (time: number) => void;
-  onPlayOriginal?: (startTime: number) => void;
+  onPlayOriginal?: (subtitleId: number) => void;
   videoLoopMode: VideoLoopMode;
   onVideoLoopModeChange: (mode: VideoLoopMode) => void;
   sentenceLoopMode: SentenceLoopMode;

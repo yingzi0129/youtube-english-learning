@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface MultiSelectProps {
   label: string;
@@ -21,11 +22,70 @@ export default function MultiSelect({
 }: MultiSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+    maxHeight: 240,
+  });
+
+  // Keep the portal dropdown anchored to the trigger button.
+  // Note: `position: fixed` uses viewport coordinates, so do NOT add scroll offsets.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const updatePosition = () => {
+      if (!buttonRef.current) return;
+
+      const rect = buttonRef.current.getBoundingClientRect();
+      const margin = 8;
+      const viewportW = window.innerWidth;
+      const viewportH = window.innerHeight;
+      const targetWidth = rect.width;
+
+      // Clamp horizontally so it doesn't go off-screen.
+      const left = Math.max(margin, Math.min(rect.left, viewportW - targetWidth - margin));
+
+      const preferredMaxHeight = 240; // Tailwind `max-h-60`
+      const spaceBelow = viewportH - rect.bottom - margin;
+      const spaceAbove = rect.top - margin;
+
+      // If there's not enough room below, open upwards.
+      const openUpwards = spaceBelow < 160 && spaceAbove > spaceBelow;
+      const maxHeight = Math.max(
+        120,
+        Math.min(preferredMaxHeight, openUpwards ? spaceAbove : spaceBelow)
+      );
+
+      // Use current dropdown height (when available) to place it snugly when opening upwards.
+      const dropdownHeight = dropdownRef.current?.offsetHeight ?? Math.min(preferredMaxHeight, maxHeight);
+      const top = openUpwards
+        ? Math.max(margin, rect.top - margin - Math.min(dropdownHeight, maxHeight))
+        : rect.bottom + margin;
+
+      setDropdownPosition({ top, left, width: targetWidth, maxHeight });
+    };
+
+    updatePosition();
+    const raf = window.requestAnimationFrame(updatePosition);
+
+    window.addEventListener('resize', updatePosition);
+    // Capture scroll events from any scroll container.
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen]);
 
   // 点击外部关闭下拉框
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) &&
+          buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -49,13 +109,14 @@ export default function MultiSelect({
     : `已选择 ${selectedValues.length} 项`;
 
   return (
-    <div ref={dropdownRef} className="relative">
+    <div className="relative z-50">
       <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
         {icon}
         {label}
       </label>
 
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="w-full px-4 py-3 text-sm font-medium border-2 border-purple-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent bg-white hover:border-purple-300 transition-all cursor-pointer text-left flex items-center justify-between"
@@ -79,8 +140,18 @@ export default function MultiSelect({
         </span>
       )}
 
-      {isOpen && (
-        <div className="absolute z-[9999] w-full mt-2 bg-white border-2 border-purple-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+      {isOpen && typeof window !== 'undefined' && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed bg-white border-2 border-purple-200 rounded-xl shadow-xl max-h-60 overflow-y-auto"
+          style={{
+            top: `${dropdownPosition.top}px`,
+            left: `${dropdownPosition.left}px`,
+            width: `${dropdownPosition.width}px`,
+            maxHeight: `${dropdownPosition.maxHeight}px`,
+            zIndex: 100000,
+          }}
+        >
           {options.length === 0 ? (
             <div className="px-4 py-3 text-sm text-gray-500 text-center">
               暂无选项
@@ -101,7 +172,8 @@ export default function MultiSelect({
               </label>
             ))
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

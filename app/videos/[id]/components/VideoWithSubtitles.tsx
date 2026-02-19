@@ -15,6 +15,7 @@ interface VideoWithSubtitlesProps {
     endTime: number;
     text: string;
     translation: string;
+    seekOffset?: number;
   }>;
 }
 
@@ -55,6 +56,20 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
   const [themeMode, setThemeMode] = useState<ThemeMode>('light');
   const [isPracticeMode, setIsPracticeMode] = useState(false);
   const videoPlayerRef = useRef<{ togglePlayPause: () => void } | null>(null);
+  const [mobileStickyTop, setMobileStickyTop] = useState<number>(0);
+
+  // Mobile: keep the sticky video right below the page header (no gap where subtitles can slide into).
+  useEffect(() => {
+    const update = () => {
+      const header = document.querySelector<HTMLElement>('[data-video-page-header="true"]');
+      const h = header?.getBoundingClientRect().height ?? 0;
+      setMobileStickyTop(Math.max(0, Math.round(h)));
+    };
+
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
 
   // 获取当前播放的句子索引
   useEffect(() => {
@@ -250,9 +265,71 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
     }, 100);
   };
 
-  // 处理播放原文
-  const handlePlayOriginal = (startTime: number) => {
-    handleSeek(startTime, true);
+  // Compute a seek target for a subtitle click.
+  // Goal: match "sentence starts" even when exported subtitle start_time is slightly late,
+  // while avoiding pulling audio from the previous subtitle when there's no gap.
+  const getSmartSeekTimeForSubtitle = (subtitleId: number) => {
+    const index = subtitles.findIndex((s) => s.id === subtitleId);
+    if (index === -1) return 0;
+
+    const sub = subtitles[index];
+    const prev = index > 0 ? subtitles[index - 1] : null;
+
+    const manualOffset = Number.isFinite(Number(sub.seekOffset)) ? Number(sub.seekOffset) : 0;
+
+    // Small padding to avoid landing exactly on boundaries.
+    const boundaryPad = 0.03;
+
+    // Default tiny backtrack to counter slight lateness / keyframe snapping.
+    const baseBack = 0.12;
+
+    // If there's a real gap, we can safely backtrack more (up to 1s) into the gap.
+    const gapBackThreshold = 0.35;
+    const maxAutoBack = 1.0;
+
+    let target = sub.startTime;
+
+    if (manualOffset !== 0) {
+      target = sub.startTime + manualOffset;
+    } else {
+      let back = baseBack;
+      if (prev) {
+        const gap = sub.startTime - prev.endTime;
+        if (gap >= gapBackThreshold) {
+          back = Math.min(maxAutoBack, Math.max(0, gap - boundaryPad));
+        } else {
+          // Only backtrack within the gap (if any), otherwise don't auto-backtrack.
+          back = Math.min(back, Math.max(0, gap - boundaryPad));
+        }
+      }
+      target = sub.startTime - back;
+    }
+
+    // Don't seek before the previous subtitle ends unless user explicitly overrides via seekOffset.
+    if (manualOffset === 0 && prev) {
+      target = Math.max(target, prev.endTime + boundaryPad);
+    }
+
+    // Clamp to valid time range.
+    target = Math.max(0, target);
+    // Avoid seeking beyond the subtitle end (very short subtitles).
+    if (sub.endTime > sub.startTime) {
+      target = Math.min(target, Math.max(0, sub.endTime - boundaryPad));
+    }
+
+    return target;
+  };
+
+  // Subtitle click: seek without forcing autoplay (video keeps current play/pause state).
+  const handleSeekToSubtitle = (subtitleId: number) => {
+    const time = getSmartSeekTimeForSubtitle(subtitleId);
+    handleSeek(time, false);
+  };
+
+  // Play original: seek and force autoplay.
+  const handlePlayOriginal = (subtitleId: number) => {
+    const time = getSmartSeekTimeForSubtitle(subtitleId);
+    handleSeek(time, true);
   };
 
   // 处理播放/暂停切换（移动端控制栏使用）
@@ -266,7 +343,12 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
     <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 pb-24 lg:pb-0">
         {/* 左侧：视频播放器 */}
-        <div className="lg:col-span-2">
+        {/* Mobile: keep the video visible while scrolling the subtitle list (page scroll). */}
+        <div
+          data-sticky-video="true"
+          className="lg:col-span-2 sticky z-30 lg:static"
+          style={{ top: mobileStickyTop }}
+        >
           <VideoPlayer
             ref={videoPlayerRef}
             videoUrl={videoUrl}
@@ -284,7 +366,7 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
           <SubtitlePanel
             subtitles={subtitles}
             currentTime={currentTime}
-            onSeek={handleSeek}
+            onSeekToSubtitle={handleSeekToSubtitle}
             onPlayOriginal={handlePlayOriginal}
             videoLoopMode={videoLoopMode}
             onVideoLoopModeChange={setVideoLoopMode}
