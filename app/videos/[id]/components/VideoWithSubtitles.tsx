@@ -60,15 +60,37 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
 
   // Mobile: keep the sticky video right below the page header (no gap where subtitles can slide into).
   useEffect(() => {
+    const header = document.querySelector<HTMLElement>('[data-video-page-header="true"]');
+    if (!header) return;
+
+    // Use offsetHeight (integer) to avoid 0.5px oscillation on mobile Safari during scroll/URL-bar resize.
     const update = () => {
-      const header = document.querySelector<HTMLElement>('[data-video-page-header="true"]');
-      const h = header?.getBoundingClientRect().height ?? 0;
-      setMobileStickyTop(Math.max(0, Math.round(h)));
+      const h = header.offsetHeight || 0;
+      setMobileStickyTop((prev) => {
+        const next = Math.max(0, h);
+        return prev === next ? prev : next;
+      });
     };
 
     update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
+
+    // Prefer observing the header itself (instead of window resize) to avoid jitter during scroll.
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => update());
+      ro.observe(header);
+    } else {
+      window.addEventListener('resize', update);
+    }
+
+    // Orientation change can affect layout without reliably triggering ResizeObserver in some browsers.
+    window.addEventListener('orientationchange', update);
+
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener('orientationchange', update);
+      window.removeEventListener('resize', update);
+    };
   }, []);
 
   // 获取当前播放的句子索引
@@ -347,7 +369,7 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
         <div
           data-sticky-video="true"
           className="lg:col-span-2 sticky z-30 lg:static"
-          style={{ top: mobileStickyTop }}
+          style={{ top: mobileStickyTop, transform: 'translateZ(0)', willChange: 'transform' }}
         >
           <VideoPlayer
             ref={videoPlayerRef}
