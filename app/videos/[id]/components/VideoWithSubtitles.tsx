@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import VideoPlayer from './VideoPlayer';
+import VideoPlayer, { type VideoPlayerRef } from './VideoPlayer';
 import SubtitlePanel from './SubtitlePanel';
 import MobileBottomControls from './MobileBottomControls';
 import { updateWatchProgress, getWatchProgress } from '@/lib/watchProgress';
@@ -16,6 +16,16 @@ interface VideoWithSubtitlesProps {
     text: string;
     translation: string;
     seekOffset?: number;
+    annotations?: Array<{
+      id: string;
+      type?: 'word' | 'phrase';
+      text: string;
+      start: number;
+      end: number;
+      phonetic?: string;
+      meaning?: string;
+      helperSentence?: string;
+    }>;
   }>;
 }
 
@@ -55,7 +65,9 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
   const [fontSize, setFontSize] = useState(16);
   const [themeMode, setThemeMode] = useState<ThemeMode>('light');
   const [isPracticeMode, setIsPracticeMode] = useState(false);
-  const videoPlayerRef = useRef<{ togglePlayPause: () => void } | null>(null);
+  const [isClozeMode, setIsClozeMode] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const videoPlayerRef = useRef<VideoPlayerRef | null>(null);
   const [mobileStickyTop, setMobileStickyTop] = useState<number>(0);
 
   // Mobile: keep the sticky video right below the page header (no gap where subtitles can slide into).
@@ -361,6 +373,11 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
     }
   };
 
+  const handlePlaybackRateChange = (rate: number) => {
+    setPlaybackRate(rate);
+    videoPlayerRef.current?.setPlaybackRate(rate);
+  };
+
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 pb-24 lg:pb-0">
@@ -406,6 +423,8 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
             themeMode={themeMode}
             isPracticeMode={isPracticeMode}
             onPracticeModeChange={setIsPracticeMode}
+            isClozeMode={isClozeMode}
+            onClozeModeChange={setIsClozeMode}
           />
         </div>
       </div>
@@ -418,6 +437,8 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
         onSubtitleModeChange={setSubtitleMode}
         fontSize={fontSize}
         onFontSizeChange={setFontSize}
+        playbackRate={playbackRate}
+        onPlaybackRateChange={handlePlaybackRateChange}
         videoLoopMode={videoLoopMode}
         onVideoLoopModeChange={setVideoLoopMode}
         sentenceLoopMode={sentenceLoopMode}

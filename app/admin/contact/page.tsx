@@ -281,7 +281,7 @@ export default function ContactManagementPage() {
                   value={formData.content}
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="添加微信号：Jos7161，备注【油管】"
+                  placeholder=""
                   rows={3}
                   required
                 />

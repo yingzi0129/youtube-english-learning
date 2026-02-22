@@ -3,6 +3,18 @@ import { createClient } from '@/lib/supabase/server';
 import VideoWithSubtitles from './components/VideoWithSubtitles';
 import VideoInfo from './components/VideoInfo';
 
+type LearningPoint = {
+  id: string;
+  type?: 'word' | 'phrase';
+  text: string;
+  // 0-based, end-exclusive indices into text_en for precise highlighting.
+  start: number;
+  end: number;
+  phonetic?: string;
+  meaning?: string;
+  helperSentence?: string;
+};
+
 export default async function VideoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   // 解包 params (Next.js 15+ 要求)
   const { id } = await params;
@@ -60,6 +72,21 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
     translation: sub.text_zh || '',
     // Optional: manual seek offset (seconds). Negative means seek earlier.
     seekOffset: Number.isFinite(Number(sub.seek_offset)) ? Number(sub.seek_offset) : 0,
+    // Optional: pre-annotated learning points (JSON from backend).
+    annotations: (() => {
+      const raw = (sub as any).annotations ?? (sub as any).learning_points ?? null;
+      if (!raw) return [] as LearningPoint[];
+      if (Array.isArray(raw)) return raw as LearningPoint[];
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? (parsed as LearningPoint[]) : ([] as LearningPoint[]);
+        } catch {
+          return [] as LearningPoint[];
+        }
+      }
+      return [] as LearningPoint[];
+    })(),
   }));
 
   return (
@@ -89,8 +116,8 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
         {/* 视频播放器和字幕面板 */}
         <VideoWithSubtitles videoUrl={video.videoUrl} subtitles={subtitles} />
 
-        {/* 视频介绍 */}
-        <div className="mt-6">
+        {/* 视频介绍：仅桌面端显示（移动端不展示此卡片） */}
+        <div className="hidden lg:block mt-6">
           <VideoInfo video={video} />
         </div>
       </div>

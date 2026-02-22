@@ -86,6 +86,13 @@ export default function AdminDashboard() {
       color: 'green',
     },
     {
+      name: '标注管理',
+      description: '为字幕标注学习点（下划线 + 单词卡 + 填空练习）',
+      icon: 'annotation',
+      link: '/admin/annotations',
+      color: 'purple',
+    },
+    {
       name: '用户管理',
       description: '查看和管理用户权限',
       icon: 'users',
@@ -153,7 +160,7 @@ export default function AdminDashboard() {
       {/* 快捷操作 */}
       <div>
         <h2 className="text-xl font-bold text-gray-900 mb-4">快捷操作</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           {quickActions.map((action) => (
             <Link
               key={action.name}
@@ -220,6 +227,9 @@ function ActionIcon({ icon, color }: { icon: string; color: string }) {
     ),
     subtitle: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+    ),
+    annotation: (
+      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 5h6a2 2 0 012 2v10a2 2 0 01-2 2H9a2 2 0 01-2-2V7a2 2 0 012-2zm2 3h4m-4 4h4m-6 7l-3 3m3-3l3 3' />
     ),
     users: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />

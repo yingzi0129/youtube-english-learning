@@ -10,6 +10,16 @@ interface Subtitle {
   text: string;
   translation: string;
   keywords: string[];
+  annotations?: Array<{
+    id: string;
+    type?: 'word' | 'phrase';
+    text: string;
+    start: number;
+    end: number;
+    phonetic?: string;
+    meaning?: string;
+    helperSentence?: string;
+  }>;
 }
 
 type VideoLoopMode = 'single' | 'loop';
@@ -65,6 +75,7 @@ export default function RightPanel({
 }: RightPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [isClozeMode, setIsClozeMode] = useState(false);
 
   const tabs = [
     {
@@ -156,6 +167,8 @@ export default function RightPanel({
             themeMode={themeMode}
             isPracticeMode={isPracticeMode}
             onPracticeModeChange={onPracticeModeChange}
+            isClozeMode={isClozeMode}
+            onClozeModeChange={setIsClozeMode}
           />
         )}
 

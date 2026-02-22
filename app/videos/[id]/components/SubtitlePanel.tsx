@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import AudioRecorder from '@/app/components/AudioRecorder';
 import { createClient } from '@/lib/supabase/client';
 
@@ -11,6 +12,7 @@ interface Subtitle {
   text: string;
   translation: string;
   seekOffset?: number;
+  annotations?: LearningPoint[];
 }
 
 type VideoLoopMode = 'single' | 'loop';
@@ -18,6 +20,17 @@ type SentenceLoopMode = 'continuous' | 'single';
 type LoopCount = 1 | 2 | 3 | -1;
 type SubtitleMode = 'bilingual' | 'chinese' | 'english';
 type ThemeMode = 'light' | 'dark';
+
+type LearningPoint = {
+  id: string;
+  type?: 'word' | 'phrase';
+  text: string;
+  start: number;
+  end: number;
+  phonetic?: string;
+  meaning?: string;
+  helperSentence?: string;
+};
 
 interface SubtitlePanelProps {
   subtitles: Subtitle[];
@@ -42,6 +55,8 @@ interface SubtitlePanelProps {
   themeMode: ThemeMode;
   isPracticeMode: boolean;
   onPracticeModeChange: (enabled: boolean) => void;
+  isClozeMode: boolean;
+  onClozeModeChange: (enabled: boolean) => void;
 }
 
 export default function SubtitlePanel({
@@ -66,12 +81,41 @@ export default function SubtitlePanel({
   themeMode,
   isPracticeMode,
   onPracticeModeChange,
+  isClozeMode,
+  onClozeModeChange,
 }: SubtitlePanelProps) {
   const subtitleListRef = useRef<HTMLDivElement>(null);
   const [pinnedSubtitleId, setPinnedSubtitleId] = useState<number | null>(null);
 
+  // Cloze (fill-in) mode: mask all annotated learning points until revealed by click.
+  // Keyed by `${subtitleId}:${learningPointId}` to avoid collisions across subtitles.
+  const [revealed, setRevealed] = useState<Record<string, true>>({});
+
+  // Word card popover state (desktop-focused; uses a portal to avoid clipping).
+  const [cardPoint, setCardPoint] = useState<LearningPoint | null>(null);
+  const [cardAnchor, setCardAnchor] = useState<DOMRect | null>(null);
+  const [isCardMounted, setIsCardMounted] = useState(false);
+  const [cardPos, setCardPos] = useState<{ top: number; left: number } | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const showPronunciationButton = false;
+
+  useEffect(() => {
+    // Portal requires DOM.
+    setIsCardMounted(true);
+  }, []);
+
+  // When entering cloze mode, reset reveal progress (per requirement: everything masked until clicked).
+  useEffect(() => {
+    if (isClozeMode) {
+      setRevealed({});
+      setCardPoint(null);
+      setCardAnchor(null);
+    }
+  }, [isClozeMode]);
+
   // 根据当前播放时间计算激活的字幕ID
-  const activeSubtitleIdByTime = React.useMemo(() => {
+  const activeSubtitleIdByTime = useMemo(() => {
     const activeSubtitle = subtitles.find(
       (sub) => currentTime >= sub.startTime && currentTime < sub.endTime
     );
@@ -80,7 +124,7 @@ export default function SubtitlePanel({
 
   // When we seek slightly earlier than a subtitle's start (smart backtracking),
   // keep the clicked subtitle highlighted until playback reaches its start time.
-  const pinnedStartTime = React.useMemo(() => {
+  const pinnedStartTime = useMemo(() => {
     if (pinnedSubtitleId == null) return null;
     return subtitles.find((s) => s.id === pinnedSubtitleId)?.startTime ?? null;
   }, [pinnedSubtitleId, subtitles]);
@@ -99,6 +143,191 @@ export default function SubtitlePanel({
       setPinnedSubtitleId(null);
     }
   }, [currentTime, pinnedSubtitleId, pinnedStartTime]);
+
+  const stopSpeaking = () => {
+    if (typeof window === 'undefined') return;
+    const synth = window.speechSynthesis;
+    if (synth) {
+      synth.cancel();
+    }
+    setIsSpeaking(false);
+  };
+
+  const closeCard = () => {
+    stopSpeaking();
+    setCardPoint(null);
+    setCardAnchor(null);
+    setCardPos(null);
+  };
+
+  // Close popover on outside click / scroll / resize (desktop UX).
+  useEffect(() => {
+    if (!cardPoint) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      const el = cardRef.current;
+      if (!el) return;
+      if (e.target instanceof Node && el.contains(e.target)) return;
+      closeCard();
+    };
+
+    const onScrollOrResize = () => closeCard();
+
+    window.addEventListener('pointerdown', onPointerDown, true);
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize, true);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, true);
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize, true);
+    };
+  }, [cardPoint]);
+
+  useLayoutEffect(() => {
+    if (!cardPoint || !cardAnchor || !cardRef.current) return;
+
+    const el = cardRef.current;
+    const rect = el.getBoundingClientRect();
+    const margin = 12;
+
+    let left = cardAnchor.left;
+    let top = cardAnchor.bottom + 10;
+
+    // Clamp horizontally.
+    left = Math.min(Math.max(margin, left), window.innerWidth - rect.width - margin);
+
+    // Prefer below; if not enough room, show above.
+    if (top + rect.height + margin > window.innerHeight) {
+      top = cardAnchor.top - rect.height - 10;
+    }
+    top = Math.min(Math.max(margin, top), window.innerHeight - rect.height - margin);
+
+    setCardPos({ top: Math.round(top), left: Math.round(left) });
+  }, [cardPoint, cardAnchor]);
+
+  const getRevealKey = (subtitleId: number, pointId: string) => `${subtitleId}:${pointId}`;
+
+  const isRevealed = (subtitleId: number, pointId: string) => {
+    return !!revealed[getRevealKey(subtitleId, pointId)];
+  };
+
+  const revealPoint = (subtitleId: number, pointId: string) => {
+    const key = getRevealKey(subtitleId, pointId);
+    setRevealed((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
+  };
+
+  const showCard = (point: LearningPoint, anchorEl: HTMLElement) => {
+    setCardPoint(point);
+    const rect = anchorEl.getBoundingClientRect();
+    setCardAnchor(rect);
+    // Initial position (may be adjusted after measuring the card).
+    setCardPos({
+      top: Math.round(rect.bottom + 10),
+      left: Math.round(rect.left),
+    });
+  };
+
+  const playPronunciation = (text: string) => {
+    if (typeof window === 'undefined' || !text?.trim()) return;
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+
+    synth.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'en-US';
+    utter.rate = 0.95;
+    utter.onend = () => setIsSpeaking(false);
+    utter.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    synth.speak(utter);
+  };
+
+  useEffect(() => {
+    return () => stopSpeaking();
+  }, []);
+
+  const normalizeLearningPoints = (text: string, points: LearningPoint[]) => {
+    const safe = (points || [])
+      .filter((p) => p && typeof p.text === 'string')
+      .map((p) => {
+        const start = Number(p.start);
+        const end = Number(p.end);
+        return {
+          ...p,
+          id: String((p as any).id ?? `${start}:${end}:${p.text}`),
+          start,
+          end,
+        };
+      })
+      .filter((p) => Number.isFinite(p.start) && Number.isFinite(p.end) && p.start >= 0 && p.end > p.start)
+      .filter((p) => p.end <= text.length)
+      .sort((a, b) => (a.start - b.start) || (b.end - b.start) - (a.end - a.start));
+
+    // Drop overlaps: keep the earliest/longest-at-same-start.
+    const out: LearningPoint[] = [];
+    let cursor = 0;
+    for (const p of safe) {
+      if (p.start < cursor) continue;
+      out.push(p);
+      cursor = p.end;
+    }
+    return out;
+  };
+
+  const renderAnnotatedEnglish = (subtitleId: number, text: string, points?: LearningPoint[]) => {
+    const normalized = normalizeLearningPoints(text, points || []);
+    if (normalized.length === 0) return text;
+
+    const nodes: React.ReactNode[] = [];
+    let i = 0;
+    for (const p of normalized) {
+      if (p.start > i) {
+        nodes.push(<span key={`t:${i}`}>{text.slice(i, p.start)}</span>);
+      }
+
+      const segment = text.slice(p.start, p.end);
+      const revealedNow = isRevealed(subtitleId, p.id);
+      const isMasked = isClozeMode && !revealedNow;
+
+      nodes.push(
+        <span
+          key={`p:${p.id}:${p.start}`}
+          role="button"
+          tabIndex={0}
+          className={
+            isMasked
+              ? 'inline-block rounded-md bg-amber-100/80 px-1 text-transparent select-none cursor-pointer'
+              : 'underline decoration-emerald-500 decoration-2 underline-offset-2 font-semibold cursor-pointer hover:bg-emerald-50/60 rounded-sm px-0.5'
+          }
+          onClick={(e) => {
+            e.stopPropagation();
+            const target = e.currentTarget as unknown as HTMLElement;
+
+            if (isClozeMode && !revealedNow) {
+              revealPoint(subtitleId, p.id);
+              return;
+            }
+
+            showCard(p, target);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              (e.currentTarget as HTMLElement).click();
+            }
+          }}
+          title={isMasked ? '点击揭晓' : '点击查看释义'}
+        >
+          {segment}
+        </span>
+      );
+
+      i = p.end;
+    }
+
+    if (i < text.length) nodes.push(<span key={`t:${i}:end`}>{text.slice(i)}</span>);
+    return nodes;
+  };
 
   // 自动滚动字幕列表：当激活字幕靠近底部/不在可视区域时，将其滚动到列表顶部位置
   useEffect(() => {
@@ -209,7 +438,8 @@ export default function SubtitlePanel({
   };
 
   return (
-    <div className="bg-white/90 backdrop-blur-md rounded-3xl shadow-lg border border-purple-100/50 overflow-hidden lg:sticky lg:top-24">
+    <React.Fragment>
+      <div className="bg-white/90 backdrop-blur-md rounded-3xl shadow-lg border border-purple-100/50 overflow-hidden lg:sticky lg:top-24">
       {/* 标题和功能图标 */}
       <div className="hidden lg:block px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
         <div className="flex items-center justify-between mb-2 lg:mb-3">
@@ -365,6 +595,9 @@ export default function SubtitlePanel({
               {/* 英语练习下拉菜单 */}
               {showPracticeMenu && (
                 <div className="absolute top-full right-0 mt-2 w-36 lg:w-40 bg-white rounded-xl shadow-lg border border-purple-100 py-2 z-20">
+                  <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
+                    英语练习
+                  </div>
                   <button
                     onClick={() => {
                       onPracticeModeChange(!isPracticeMode);
@@ -372,8 +605,18 @@ export default function SubtitlePanel({
                     }}
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-center justify-between"
                   >
-                    <span>口语练习</span>
+                    <span>跟读练习</span>
                     {isPracticeMode && <span className="text-purple-600">✓</span>}
+                  </button>
+                  <button
+                    onClick={() => {
+                      onClozeModeChange(!isClozeMode);
+                      setShowPracticeMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-center justify-between"
+                  >
+                    <span>填空练习</span>
+                    {isClozeMode && <span className="text-purple-600">✓</span>}
                   </button>
                 </div>
               )}
@@ -491,7 +734,7 @@ export default function SubtitlePanel({
                   `}
                   style={{ fontSize: `${fontSize}px` }}
                 >
-                  {subtitle.text}
+                  {renderAnnotatedEnglish(subtitle.id, subtitle.text, subtitle.annotations)}
                 </p>
               )}
 
@@ -537,5 +780,73 @@ export default function SubtitlePanel({
         })}
       </div>
     </div>
+
+      {isCardMounted && cardPoint && cardPos
+        ? createPortal((
+          <div
+            ref={cardRef}
+            className="fixed z-[100] w-[360px] max-w-[calc(100vw-24px)] bg-white rounded-2xl shadow-2xl border border-gray-200 p-5"
+            style={{ top: cardPos.top, left: cardPos.left }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-2xl font-bold text-gray-900 break-words">
+                  {cardPoint.text}
+                </div>
+                {(cardPoint.phonetic || showPronunciationButton) && (
+                  <div className="mt-2 flex items-center gap-2">
+                    {cardPoint.phonetic && (
+                      <div className="text-base text-gray-500 italic">
+                        {cardPoint.phonetic}
+                      </div>
+                    )}
+                    {showPronunciationButton && (
+                      <button
+                        onClick={() => playPronunciation(cardPoint.text)}
+                        className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                        title="播放发音"
+                      >
+                        <svg className={`w-3.5 h-3.5 ${isSpeaking ? 'text-purple-600' : 'text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.25 4.5a.75.75 0 011.5 0v11a.75.75 0 01-1.5 0V4.5zM6 7.75a.75.75 0 011.5 0v4.5a.75.75 0 01-1.5 0v-4.5zm6.5-2.25a.75.75 0 011.5 0v9a.75.75 0 01-1.5 0v-9z" />
+                        </svg>
+                        发音
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={closeCard}
+                className="shrink-0 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                aria-label="Close"
+              >
+                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {cardPoint.meaning && (
+              <div className="mt-4">
+                <div className="text-xs font-semibold text-gray-500 uppercase">释义</div>
+                <div className="mt-1 text-base font-semibold text-gray-900 leading-relaxed break-words">
+                  {cardPoint.meaning}
+                </div>
+              </div>
+            )}
+
+            {cardPoint.helperSentence && (
+              <div className="mt-4">
+                <div className="text-xs font-semibold text-gray-500 uppercase">用法</div>
+                <div className="mt-2 inline-block max-w-full rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-800 break-words">
+                  {cardPoint.helperSentence}
+                </div>
+              </div>
+            )}
+          </div>),
+          document.body
+        )
+        : null}
+    </React.Fragment>
   );
 }

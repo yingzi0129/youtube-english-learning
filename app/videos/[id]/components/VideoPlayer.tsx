@@ -14,6 +14,8 @@ interface VideoPlayerProps {
 
 export interface VideoPlayerRef {
   togglePlayPause: () => void;
+  setPlaybackRate: (rate: number) => void;
+  getPlaybackRate: () => number;
 }
 
 const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({ videoUrl, onTimeUpdate, onDurationChange, onPlayStateChange, onPause, seekToTime, autoPlayOnSeek = false }, ref) => {
@@ -24,6 +26,16 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({ videoUrl, on
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
 
   const speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
+  const applyPlaybackRate = (rate: number) => {
+    const next = Number(rate);
+    if (!Number.isFinite(next) || next <= 0) return;
+
+    setPlaybackRate(next);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = next;
+    }
+  };
 
   // 暴露播放暂停控制方法给父组件
   useImperativeHandle(ref, () => ({
@@ -36,6 +48,10 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({ videoUrl, on
         }
       }
     },
+    setPlaybackRate: (rate: number) => {
+      applyPlaybackRate(rate);
+    },
+    getPlaybackRate: () => playbackRate,
   }));
 
   // 监听视频时间更新
@@ -126,6 +142,10 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({ videoUrl, on
     setIsLoading(false);
     setError(null);
 
+    if (videoRef.current) {
+      videoRef.current.playbackRate = playbackRate;
+    }
+
     // 通知父组件视频时长
     if (videoRef.current && onDurationChange) {
       onDurationChange(videoRef.current.duration);
@@ -156,11 +176,8 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({ videoUrl, on
 
   // 改变播放速度
   const handleSpeedChange = (speed: number) => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = speed;
-      setPlaybackRate(speed);
-      setShowSpeedMenu(false);
-    }
+    applyPlaybackRate(speed);
+    setShowSpeedMenu(false);
   };
 
   return (

@@ -15,6 +15,8 @@ interface MobileBottomControlsProps {
   onSubtitleModeChange: (mode: SubtitleMode) => void;
   fontSize: number;
   onFontSizeChange: (size: number) => void;
+  playbackRate: number;
+  onPlaybackRateChange: (rate: number) => void;
   videoLoopMode: VideoLoopMode;
   onVideoLoopModeChange: (mode: VideoLoopMode) => void;
   sentenceLoopMode: SentenceLoopMode;
@@ -30,7 +32,7 @@ interface MobileBottomControlsProps {
   onPracticeModeChange: (enabled: boolean) => void;
 }
 
-type PanelType = 'subtitle' | 'loop' | 'theme' | 'practice' | null;
+type PanelType = 'subtitle' | 'loop' | 'speed' | 'theme' | 'practice' | null;
 
 export default function MobileBottomControls({
   isPlaying,
@@ -39,6 +41,8 @@ export default function MobileBottomControls({
   onSubtitleModeChange,
   fontSize,
   onFontSizeChange,
+  playbackRate,
+  onPlaybackRateChange,
   videoLoopMode,
   onVideoLoopModeChange,
   sentenceLoopMode,
@@ -273,6 +277,29 @@ export default function MobileBottomControls({
             )}
 
             {/* 主题模式面板 */}
+            {activePanel === 'speed' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  {[0.5, 0.75, 1, 1.25, 1.5, 2].map((speed) => (
+                    <button
+                      key={speed}
+                      onClick={() => {
+                        onPlaybackRateChange(speed);
+                        handleClosePanel();
+                      }}
+                      className={`py-3 rounded-xl text-sm font-medium transition-all ${
+                        playbackRate === speed
+                          ? 'bg-purple-600 text-white shadow-lg'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {speed}倍
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {activePanel === 'theme' && (
               <div className="space-y-3">
                 <button
@@ -388,21 +415,15 @@ export default function MobileBottomControls({
 
             {/* 右侧第一个：模式 */}
             <button
-              onClick={() => handlePanelToggle('theme')}
+              onClick={() => handlePanelToggle('speed')}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                activePanel === 'theme' ? 'bg-purple-50' : 'hover:bg-gray-50'
+                activePanel === 'speed' ? 'bg-purple-50' : 'hover:bg-gray-50'
               }`}
             >
-              {themeMode === 'light' ? (
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              ) : (
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-              )}
-              <span className="text-xs text-gray-600">模式</span>
+              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span className="text-xs text-gray-600">倍速</span>
             </button>
 
             {/* 右侧第二个：跟读 */}

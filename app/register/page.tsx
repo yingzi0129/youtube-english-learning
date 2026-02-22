@@ -290,7 +290,7 @@ export default function RegisterPage() {
           {/* 联系方式 */}
           <p className="text-center text-sm text-gray-500 mt-3">
             没有激活码，请联系微信号：
-            <span className="font-semibold text-purple-600">yingzix688</span>
+            <span className="font-semibold text-purple-600">yingzix633</span>
           </p>
         </div>
       </div>
