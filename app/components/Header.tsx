@@ -55,36 +55,47 @@ export default function Header({ isAdmin = false }: HeaderProps) {
         ${isVisible ? 'translate-y-0' : '-translate-y-full'}
       `}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-        <div className="flex items-center justify-between">
+      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-4">
+        <div className="flex items-center justify-between gap-2">
           {/* 左侧 Logo 和标题 */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-md">
-              <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+          <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-shrink">
+            <div className="w-8 h-8 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg sm:rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+              <svg className="w-4 h-4 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
               </svg>
             </div>
-            <h1 className="text-base sm:text-lg lg:text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            <h1 className="text-base sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent truncate">
               油管英语学习
             </h1>
           </div>
 
           {/* 右侧导航按钮 */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+            {/* 学习记录图标按钮 - 仅移动端显示 */}
+            <button
+              onClick={() => router.push('/learning-history')}
+              className="md:hidden w-9 h-9 flex items-center justify-center bg-white hover:bg-purple-50 rounded-full transition-all duration-300 shadow-sm border border-purple-100 hover:shadow-md hover:scale-105"
+              title="学习记录"
+            >
+              <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
+            </button>
+
             {/* 管理后台按钮 - 仅管理员可见 */}
             {isAdmin && (
               <button
                 onClick={() => router.push('/admin')}
-                className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm rounded-full hover:shadow-lg transition-all duration-300 hover:scale-105"
+                className="flex items-center justify-center gap-1 px-2 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs sm:text-sm rounded-full hover:shadow-lg transition-all duration-300 hover:scale-105"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 <span className="hidden sm:inline">管理后台</span>
               </button>
             )}
-            <button className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm rounded-full hover:shadow-lg transition-all duration-300 hover:scale-105">
+            <button className="hidden sm:flex items-center px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs sm:text-sm rounded-full hover:shadow-lg transition-all duration-300 hover:scale-105">
               视频库
             </button>
             <button
@@ -93,12 +104,19 @@ export default function Header({ isAdmin = false }: HeaderProps) {
             >
               学习记录
             </button>
-            <span className="hidden sm:inline text-sm text-gray-600">用户3291</span>
+            <button
+              onClick={() => router.push('/word-cards')}
+              className="hidden md:block px-4 py-2 text-gray-700 hover:bg-purple-50 rounded-full transition-colors text-sm"
+            >
+              单词卡片
+            </button>
+            <span className="hidden lg:inline text-sm text-gray-600">用户3291</span>
             <button
               onClick={() => setShowLogoutModal(true)}
-              className="px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-100 text-gray-700 text-sm rounded-full hover:bg-gray-200 transition-colors"
+              className="px-2 py-1.5 sm:px-4 sm:py-2 bg-gray-100 text-gray-700 text-xs sm:text-sm rounded-full hover:bg-gray-200 transition-colors whitespace-nowrap"
             >
-              退出登录
+              <span className="hidden sm:inline">退出登录</span>
+              <span className="sm:hidden">退出</span>
             </button>
           </div>
         </div>

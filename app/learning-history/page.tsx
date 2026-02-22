@@ -20,11 +20,16 @@ interface WatchHistoryItem {
   };
 }
 
+interface ImageLoadState {
+  [key: string]: boolean;
+}
+
 export default function LearningHistoryPage() {
   const router = useRouter();
   const [history, setHistory] = useState<WatchHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imageLoaded, setImageLoaded] = useState<ImageLoadState>({});
 
   useEffect(() => {
     fetchWatchHistory();
@@ -183,16 +188,31 @@ export default function LearningHistoryPage() {
                 className="bg-white/90 backdrop-blur-md rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-105"
               >
                 {/* 缩略图 */}
-                <div className="relative aspect-video bg-gray-200">
+                <div className="relative aspect-video bg-gradient-to-br from-purple-400 via-pink-400 to-rose-400">
+                  {/* 加载动画 */}
+                  {!imageLoaded[item.id] && item.video?.thumbnail_url && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    </div>
+                  )}
+
                   {item.video?.thumbnail_url ? (
                     <img
                       src={item.video.thumbnail_url}
                       alt={item.video.title}
-                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                        imageLoaded[item.id] ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      onLoad={() => setImageLoaded(prev => ({ ...prev, [item.id]: true }))}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        setImageLoaded(prev => ({ ...prev, [item.id]: true }));
+                      }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="absolute inset-0 w-full h-full flex items-center justify-center">
+                      <svg className="w-16 h-16 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                     </div>

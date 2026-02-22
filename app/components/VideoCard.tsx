@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface VideoCardProps {
@@ -27,18 +27,40 @@ export default function VideoCard({
   date,
 }: VideoCardProps) {
   const router = useRouter();
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const handleClick = () => {
     router.push(`/videos/${id}`);
   };
 
-  const tagColors: { [key: string]: string } = {
-    '日常生活': 'bg-purple-100 text-purple-700',
-    '健康养生': 'bg-emerald-100 text-emerald-700',
-    '城市旅行': 'bg-sky-100 text-sky-700',
-    '美妆护肤': 'bg-rose-100 text-rose-700',
-    '美食配送': 'bg-amber-100 text-amber-700',
-    '观点表达': 'bg-indigo-100 text-indigo-700',
+  // 为标签生成一致的颜色
+  const getTagColor = (tag: string) => {
+    const colors = [
+      'bg-purple-100 text-purple-700',
+      'bg-emerald-100 text-emerald-700',
+      'bg-sky-100 text-sky-700',
+      'bg-rose-100 text-rose-700',
+      'bg-amber-100 text-amber-700',
+      'bg-indigo-100 text-indigo-700',
+      'bg-pink-100 text-pink-700',
+      'bg-cyan-100 text-cyan-700',
+      'bg-teal-100 text-teal-700',
+      'bg-orange-100 text-orange-700',
+      'bg-lime-100 text-lime-700',
+      'bg-fuchsia-100 text-fuchsia-700',
+      'bg-violet-100 text-violet-700',
+      'bg-blue-100 text-blue-700',
+    ];
+
+    // 使用标签名称生成一个稳定的哈希值
+    let hash = 0;
+    for (let i = 0; i < tag.length; i++) {
+      hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    // 使用哈希值选择颜色
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
   };
 
   return (
@@ -48,15 +70,27 @@ export default function VideoCard({
     >
       {/* 视频缩略图 */}
       <div className="relative aspect-video bg-gradient-to-br from-purple-400 via-pink-400 to-rose-400 flex items-center justify-center overflow-hidden">
+        {/* 加载动画 */}
+        {!imageLoaded && thumbnail && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+          </div>
+        )}
+
         {/* 封面图片 */}
         {thumbnail ? (
           <img
             src={thumbnail}
             alt={title}
-            className="absolute inset-0 w-full h-full object-cover"
+            loading="lazy"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+              imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            onLoad={() => setImageLoaded(true)}
             onError={(e) => {
               // 图片加载失败时隐藏图片，显示默认背景
               e.currentTarget.style.display = 'none';
+              setImageLoaded(true);
             }}
           />
         ) : null}
@@ -94,7 +128,7 @@ export default function VideoCard({
           {tags.map((tag, index) => (
             <span
               key={index}
-              className={`text-xs px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-full font-semibold ${tagColors[tag] || 'bg-gray-100 text-gray-700'}`}
+              className={`text-xs px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-full font-semibold ${getTagColor(tag)}`}
             >
               {tag}
             </span>
