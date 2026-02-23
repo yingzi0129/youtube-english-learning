@@ -37,6 +37,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
                 <NavLink href="/admin/subtitles" icon="subtitle">字幕管理</NavLink>
                 <NavLink href="/admin/contact" icon="contact">联系方式</NavLink>
                 <NavLink href="/admin/activation-codes" icon="code">激活码</NavLink>
+                <NavLink href="/admin/trial" icon="trial">试用页</NavLink>
                 <NavLink href="/admin/users" icon="users">用户管理</NavLink>
               </nav>
             </div>
@@ -83,6 +84,9 @@ function NavLink({ href, icon, children }: { href: string; icon: string; childre
     ),
     code: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+    ),
+    trial: (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h12a2 2 0 012 2v3a2 2 0 010 4v3a2 2 0 01-2 2H6a2 2 0 01-2-2v-3a2 2 0 010-4V6zm4 1h4m-4 4h8m-8 4h4" />
     ),
     users: (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />

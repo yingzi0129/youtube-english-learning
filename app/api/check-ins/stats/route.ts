@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { isTrialUser } from '@/lib/auth/trial';
 
 // 获取中国时区的今日日期（格式：YYYY-MM-DD）
 function getChinaDate(): string {
@@ -26,11 +27,19 @@ export async function GET() {
       );
     }
 
+    const isTrial = isTrialUser(user);
+
     // 获取视频总数
-    const { count: videoCount, error: videoError } = await supabase
+    let videoQuery = supabase
       .from('videos')
       .select('*', { count: 'exact', head: true })
       .eq('is_deleted', false);
+
+    if (isTrial) {
+      videoQuery = videoQuery.eq('is_trial', true);
+    }
+
+    const { count: videoCount, error: videoError } = await videoQuery;
 
     if (videoError) {
       console.error('获取视频总数错误:', videoError);

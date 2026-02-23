@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { isTrialUser } from '@/lib/auth/trial';
 import VideoWithSubtitles from './components/VideoWithSubtitles';
 import VideoInfo from './components/VideoInfo';
 
@@ -21,12 +22,20 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
 
   // 从数据库获取视频数据
   const supabase = await createClient();
-  const { data: videoData, error } = await supabase
+  const { data: { user } } = await supabase.auth.getUser();
+  const isTrial = isTrialUser(user);
+
+  let videoQuery = supabase
     .from('videos')
     .select('*')
     .eq('id', id)
-    .eq('is_deleted', false)
-    .single();
+    .eq('is_deleted', false);
+
+  if (isTrial) {
+    videoQuery = videoQuery.eq('is_trial', true);
+  }
+
+  const { data: videoData, error } = await videoQuery.single();
 
   // 如果视频不存在，显示404页面
   if (error || !videoData) {
@@ -96,17 +105,21 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
         data-video-page-header="true"
         className="bg-white/80 backdrop-blur-md border-b border-purple-100 sticky top-0 z-50 shadow-sm"
       >
-        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-4">
+        <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+          <div className="flex items-center gap-3">
             <a
               href="/"
               className="flex items-center gap-2 text-gray-700 hover:text-purple-600 transition-colors"
+              aria-label="返回视频库"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              <span className="font-medium">返回视频库</span>
+              <span className="hidden sm:inline font-medium">返回视频库</span>
             </a>
+            <div className="flex-1 min-w-0 sm:hidden">
+              <h1 className="text-sm font-semibold text-gray-900 truncate">{video.title}</h1>
+            </div>
           </div>
         </div>
       </header>

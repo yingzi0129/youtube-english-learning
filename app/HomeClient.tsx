@@ -24,9 +24,15 @@ interface HomeClientProps {
     date: string;
   }>;
   error: any;
+  userLabel?: string;
+  notice?: {
+    title?: string;
+    content: string;
+  } | null;
+  isLoading?: boolean;
 }
 
-export default function HomeClient({ isAdmin, videos, error }: HomeClientProps) {
+export default function HomeClient({ isAdmin, videos, error, userLabel, notice, isLoading = false }: HomeClientProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({
     difficulty: '全部',
@@ -95,7 +101,7 @@ export default function HomeClient({ isAdmin, videos, error }: HomeClientProps) 
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
-      <Header isAdmin={isAdmin} />
+      <Header isAdmin={isAdmin} userLabel={userLabel} />
 
       {/* 顶部统计区域 - 全宽展示 */}
       <div className="bg-white/60 backdrop-blur-md border-b border-purple-100/50 shadow-sm">
@@ -142,6 +148,23 @@ export default function HomeClient({ isAdmin, videos, error }: HomeClientProps) 
 
           {/* 中间视频网格区域 */}
           <main className="xl:col-span-9">
+            {notice?.content && (
+              <div className="mb-6 rounded-2xl border border-purple-100 bg-purple-50/80 p-4 lg:p-5 shadow-sm">
+                <div className="flex items-start gap-4">
+                  <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-purple-600">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 4a8 8 0 100 16 8 8 0 000-16z" />
+                    </svg>
+                  </div>
+                  <div className="text-base text-purple-700">
+                    {notice.title && (
+                      <div className="mb-1 text-lg font-semibold text-purple-800">{notice.title}</div>
+                    )}
+                    <div className="whitespace-pre-line leading-relaxed">{notice.content}</div>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* 筛选器区域 - 仅电脑端显示 */}
             <div className="hidden lg:block mb-8">
               <SearchFilters
@@ -151,6 +174,23 @@ export default function HomeClient({ isAdmin, videos, error }: HomeClientProps) 
                 onFilterChange={setFilters}
               />
             </div>
+
+            {/* 加载占位 */}
+            {isLoading && (
+              <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-4 lg:gap-6">
+                {[1, 2, 3, 4, 5, 6].map((item) => (
+                  <div
+                    key={item}
+                    className="bg-white/90 backdrop-blur-md rounded-2xl lg:rounded-3xl p-4 shadow-lg border border-purple-100/50 animate-pulse"
+                  >
+                    <div className="h-36 w-full rounded-xl bg-gray-200"></div>
+                    <div className="mt-4 h-4 w-3/4 rounded bg-gray-200"></div>
+                    <div className="mt-2 h-3 w-2/3 rounded bg-gray-200"></div>
+                    <div className="mt-4 h-6 w-1/3 rounded-full bg-gray-200"></div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* 错误提示 */}
             {error && (
@@ -167,7 +207,7 @@ export default function HomeClient({ isAdmin, videos, error }: HomeClientProps) 
             )}
 
             {/* 空状态提示 */}
-            {!error && videos.length === 0 && (
+            {!error && !isLoading && videos.length === 0 && (
               <div className="bg-white/90 backdrop-blur-md rounded-2xl lg:rounded-3xl p-8 lg:p-12 text-center shadow-lg border border-purple-100/50">
                 <div className="w-16 h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 lg:w-10 lg:h-10 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -181,7 +221,7 @@ export default function HomeClient({ isAdmin, videos, error }: HomeClientProps) 
             )}
 
             {/* 视频网格 */}
-            {!error && videos.length > 0 && (
+            {!error && !isLoading && videos.length > 0 && (
               <>
                 {filteredVideos.length === 0 ? (
                   <div className="bg-white/90 backdrop-blur-md rounded-2xl lg:rounded-3xl p-8 lg:p-12 text-center shadow-lg border border-purple-100/50">

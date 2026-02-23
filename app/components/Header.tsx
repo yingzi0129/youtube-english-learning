@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 
 interface HeaderProps {
   isAdmin?: boolean;
+  userLabel?: string;
 }
 
-export default function Header({ isAdmin = false }: HeaderProps) {
+export default function Header({ isAdmin = false, userLabel }: HeaderProps) {
   const router = useRouter();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
@@ -110,7 +111,7 @@ export default function Header({ isAdmin = false }: HeaderProps) {
             >
               单词卡片
             </button>
-            <span className="hidden lg:inline text-sm text-gray-600">用户3291</span>
+            <span className="hidden lg:inline text-sm text-gray-600">{userLabel || '用户3291'}</span>
             <button
               onClick={() => setShowLogoutModal(true)}
               className="px-2 py-1.5 sm:px-4 sm:py-2 bg-gray-100 text-gray-700 text-xs sm:text-sm rounded-full hover:bg-gray-200 transition-colors whitespace-nowrap"

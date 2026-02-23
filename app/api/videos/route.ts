@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { isTrialUser } from '@/lib/auth/trial';
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
 
+    const { data: { user } } = await supabase.auth.getUser();
+    const isTrial = isTrialUser(user);
+
     // 从数据库获取所有未删除的视频，按发布日期降序排列
-    const { data: videos, error } = await supabase
+    let query = supabase
       .from('videos')
       .select('*')
-      .eq('is_deleted', false)
+      .eq('is_deleted', false);
+
+    if (isTrial) {
+      query = query.eq('is_trial', true);
+    }
+
+    const { data: videos, error } = await query
       .order('published_at', { ascending: false });
 
     if (error) {

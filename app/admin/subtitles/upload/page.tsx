@@ -54,6 +54,63 @@ export default function UploadSubtitlesPage() {
     return 0;
   };
 
+  const DEFAULT_SUBTITLE_DURATION = 5;
+
+  const toFiniteNumber = (value: unknown, fallback = 0) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : fallback;
+  };
+
+  const normalizeSubtitleTimes = (items: SubtitleItem[]): SubtitleItem[] => {
+    if (!Array.isArray(items)) return [];
+
+    const normalized = items.map((item, index) => ({
+      ...item,
+      sequence: Number.isFinite(Number(item.sequence)) ? Number(item.sequence) : index + 1,
+      start_time: toFiniteNumber(item.start_time, 0),
+      end_time: toFiniteNumber(item.end_time, NaN),
+      text_en: item.text_en ?? '',
+      text_zh: item.text_zh ?? '',
+    }));
+
+    let i = 0;
+    while (i < normalized.length) {
+      const currentStart = normalized[i].start_time;
+      let j = i + 1;
+      while (j < normalized.length && normalized[j].start_time === currentStart) {
+        j++;
+      }
+      const nextStart = j < normalized.length ? normalized[j].start_time : null;
+
+      const groupSize = j - i;
+      const baseEnd =
+        Number.isFinite(nextStart) && (nextStart as number) > currentStart
+          ? (nextStart as number)
+          : currentStart + DEFAULT_SUBTITLE_DURATION;
+
+      if (groupSize > 1) {
+        const window = Math.max(0.001, baseEnd - currentStart);
+        const slot = window / groupSize;
+
+        for (let k = i; k < j; k++) {
+          const offset = slot * (k - i);
+          normalized[k].start_time = currentStart + offset;
+          normalized[k].end_time = currentStart + offset + slot;
+        }
+      } else {
+        const current = normalized[i];
+        const hasValidEnd = Number.isFinite(current.end_time) && current.end_time > current.start_time;
+        if (!hasValidEnd) {
+          current.end_time = baseEnd;
+        }
+      }
+
+      i = j;
+    }
+
+    return normalized;
+  };
+
   // 解析自定义文本格式
   const parseTextFormat = (content: string): SubtitleItem[] => {
     const lines = content.trim().split('\n');
@@ -108,7 +165,7 @@ export default function UploadSubtitlesPage() {
       }
     }
 
-    return subtitles;
+    return normalizeSubtitleTimes(subtitles);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,7 +182,7 @@ export default function UploadSubtitlesPage() {
       if (fileName.endsWith('.json')) {
         setFileType('json');
         try {
-          const parsed = JSON.parse(content);
+          const parsed = normalizeSubtitleTimes(JSON.parse(content));
           setPreviewData(parsed);
           setError('');
         } catch (err) {
@@ -178,13 +235,16 @@ export default function UploadSubtitlesPage() {
       await supabase.from('subtitles').delete().eq('video_id', videoId);
 
       // 插入新字幕
-      const subtitlesToInsert = subtitles.map((item: SubtitleItem) => ({
+      const normalizedSubtitles = normalizeSubtitleTimes(subtitles);
+      const subtitlesToInsert = normalizedSubtitles.map((item: SubtitleItem) => ({
         video_id: videoId,
         sequence: item.sequence,
         start_time: item.start_time,
         end_time: item.end_time,
         text_en: item.text_en || null,
         text_zh: item.text_zh || null,
+        seek_offset_confirmed_value: null,
+        seek_offset_confirmed_at: null,
       }));
 
       const { error: insertError } = await supabase
@@ -299,7 +359,7 @@ Erewhon 实际上已经成为了孵化器。`}
               // 尝试解析
               try {
                 // 先尝试JSON
-                const parsed = JSON.parse(content);
+                const parsed = normalizeSubtitleTimes(JSON.parse(content));
                 setFileType('json');
                 setPreviewData(parsed);
                 setError('');

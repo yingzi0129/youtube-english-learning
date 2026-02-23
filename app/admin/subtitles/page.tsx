@@ -131,6 +131,7 @@ export default function SubtitlesManagementPage() {
   const isSeekOffsetConfirmed = (s: Subtitle) => {
     const v = s.seek_offset_confirmed_value;
     const cur = s.seek_offset ?? 0;
+    if (!s.seek_offset_confirmed_at) return false;
     if (v === null || v === undefined) return false;
     return Math.abs(Number(v) - Number(cur)) < 0.0005;
   };

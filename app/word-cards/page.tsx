@@ -92,13 +92,15 @@ export default function WordCardsPage() {
         }
         setUserId(user.id);
 
-        const { data, error: ve } = await supabase
-          .from('videos')
-          .select('id, title')
-          .eq('is_deleted', false)
-          .order('published_at', { ascending: false });
-        if (ve) throw ve;
-        const list = (data || []) as VideoItem[];
+        const response = await fetch('/api/videos');
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.error || '获取视频失败');
+        }
+        const list = (data?.videos || []).map((video: any) => ({
+          id: video.id,
+          title: video.title,
+        })) as VideoItem[];
         setVideos(list);
         setSelectedVideoId(list[0]?.id || null);
       } catch (e: any) {
