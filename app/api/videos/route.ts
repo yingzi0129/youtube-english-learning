@@ -24,10 +24,12 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('获取视频数据错误:', error);
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: '获取视频数据失败' },
         { status: 500 }
       );
+      response.headers.set('Cache-Control', 'no-store');
+      return response;
     }
 
     // 格式化视频数据，确保与前端期望的格式一致
@@ -62,15 +64,20 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       videos: formattedVideos,
     });
+    response.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30');
+    response.headers.set('Vary', 'Cookie');
+    return response;
   } catch (error) {
     console.error('服务器错误:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: '服务器错误，请稍后重试' },
       { status: 500 }
     );
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
   }
 }

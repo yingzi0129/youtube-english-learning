@@ -37,6 +37,11 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({ videoUrl, on
     }
   };
 
+  useEffect(() => {
+    setIsLoading(true);
+    setError(null);
+  }, [videoUrl]);
+
   // 暴露播放暂停控制方法给父组件
   useImperativeHandle(ref, () => ({
     togglePlayPause: () => {
@@ -152,6 +157,22 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({ videoUrl, on
     }
   };
 
+  const handleLoadStart = () => {
+    setIsLoading(true);
+  };
+
+  const handleCanPlay = () => {
+    setIsLoading(false);
+  };
+
+  const handlePlaying = () => {
+    setIsLoading(false);
+  };
+
+  const handleWaiting = () => {
+    setIsLoading(true);
+  };
+
   const handleError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     setIsLoading(false);
     setError('视频加载失败，请检查视频文件是否存在或格式是否正确');
@@ -208,6 +229,10 @@ const VideoPlayer = forwardRef<VideoPlayerRef, VideoPlayerProps>(({ videoUrl, on
           className="w-full h-full"
           controls
           controlsList="nodownload"
+          onLoadStart={handleLoadStart}
+          onCanPlay={handleCanPlay}
+          onPlaying={handlePlaying}
+          onWaiting={handleWaiting}
           onLoadedData={handleLoadedData}
           onError={handleError}
           onTimeUpdate={handleTimeUpdate}

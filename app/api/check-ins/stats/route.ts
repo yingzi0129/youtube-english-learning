@@ -21,10 +21,12 @@ export async function GET() {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: '未授权' },
         { status: 401 }
       );
+      response.headers.set('Cache-Control', 'no-store');
+      return response;
     }
 
     const isTrial = isTrialUser(user);
@@ -43,10 +45,12 @@ export async function GET() {
 
     if (videoError) {
       console.error('获取视频总数错误:', videoError);
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: '获取视频总数失败' },
         { status: 500 }
       );
+      response.headers.set('Cache-Control', 'no-store');
+      return response;
     }
 
     // 获取打卡总天数
@@ -57,10 +61,12 @@ export async function GET() {
 
     if (checkInError) {
       console.error('获取打卡天数错误:', checkInError);
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: '获取打卡天数失败' },
         { status: 500 }
       );
+      response.headers.set('Cache-Control', 'no-store');
+      return response;
     }
 
     // 检查今日是否已打卡
@@ -75,22 +81,29 @@ export async function GET() {
     if (todayError && todayError.code !== 'PGRST116') {
       // PGRST116 表示没有找到记录，这是正常的
       console.error('检查今日打卡错误:', todayError);
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: '检查今日打卡失败' },
         { status: 500 }
       );
+      response.headers.set('Cache-Control', 'no-store');
+      return response;
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       videoCount: videoCount || 0,
       checkInDays: checkInCount || 0,
       hasCheckedInToday: !!todayCheckIn,
     });
+    response.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30');
+    response.headers.set('Vary', 'Cookie');
+    return response;
   } catch (error) {
     console.error('获取打卡统计数据错误:', error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: '服务器错误' },
       { status: 500 }
     );
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
   }
 }

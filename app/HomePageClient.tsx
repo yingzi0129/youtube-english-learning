@@ -34,17 +34,26 @@ export default function HomePageClient() {
 
   useEffect(() => {
     let cancelled = false;
+    const videosController = new AbortController();
+    const videosPromise = fetch('/api/videos', { signal: videosController.signal }).catch((err: any) => {
+      if (err?.name === 'AbortError') {
+        return null;
+      }
+      throw err;
+    });
 
     const loadData = async () => {
       try {
         const authResp = await fetch('/api/auth/me');
         if (!authResp.ok) {
+          videosController.abort();
           router.push('/login');
           return;
         }
         const authData: AuthResponse = await authResp.json();
 
         if (authData?.isTrial) {
+          videosController.abort();
           router.replace('/trial');
           return;
         }
@@ -54,7 +63,10 @@ export default function HomePageClient() {
           setUserLabel(authData?.phone ? authData.phone : undefined);
         }
 
-        const videosResp = await fetch('/api/videos');
+        const videosResp = await videosPromise;
+        if (!videosResp) {
+          return;
+        }
         const videosData = await videosResp.json();
         if (!videosResp.ok) {
           throw new Error(videosData?.error || '获取视频失败');
@@ -77,6 +89,7 @@ export default function HomePageClient() {
     loadData();
     return () => {
       cancelled = true;
+      videosController.abort();
     };
   }, [router]);
 
