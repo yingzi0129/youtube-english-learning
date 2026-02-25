@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 
 interface User {
   id: string;
-  phone: string;
+  phone?: string | null;
   role: 'user' | 'admin';
   created_at: string;
   email?: string;
@@ -16,6 +16,9 @@ export default function UsersManagementPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'all' | 'admin' | 'user'>('all');
+  const [resettingId, setResettingId] = useState<string | null>(null);
+  const [resetResult, setResetResult] = useState<{ phone?: string; password: string; expiresAt: string } | null>(null);
+  const [resetError, setResetError] = useState('');
 
   useEffect(() => {
     fetchUsers();
@@ -70,6 +73,49 @@ export default function UsersManagementPage() {
     }
   };
 
+  const handleResetPassword = async (user: User) => {
+    if (!user?.id) return;
+
+    const confirmed = window.confirm(
+      `确定要重置手机号 ${user.phone || '-'} 的密码吗？\n重置后会生成一次性临时密码。`
+    );
+    if (!confirmed) return;
+
+    setResetError('');
+    setResettingId(user.id);
+
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}/reset-password`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '重置密码失败');
+      }
+
+      setResetResult({
+        phone: user.phone,
+        password: data.temporaryPassword,
+        expiresAt: data.expiresAt,
+      });
+    } catch (err: any) {
+      setResetError(err.message || '重置密码失败');
+    } finally {
+      setResettingId(null);
+    }
+  };
+
+  const handleCopyPassword = async () => {
+    if (!resetResult?.password) return;
+    try {
+      await navigator.clipboard.writeText(resetResult.password);
+      alert('临时密码已复制');
+    } catch (err) {
+      alert('复制失败，请手动复制');
+    }
+  };
+
   const stats = {
     total: users.length,
     admin: users.filter(u => u.role === 'admin').length,
@@ -88,6 +134,12 @@ export default function UsersManagementPage() {
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <p className="text-red-800">{error}</p>
+        </div>
+      )}
+
+      {resetError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800">重置密码失败: {resetError}</p>
         </div>
       )}
 
@@ -186,7 +238,19 @@ export default function UsersManagementPage() {
                       {user.id.substring(0, 8)}...
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {user.phone || '-'}
+                      {user.phone ? (
+                        <button
+                          type="button"
+                          onClick={() => handleResetPassword(user)}
+                          disabled={resettingId === user.id}
+                          className="text-purple-600 hover:text-purple-700 font-medium disabled:opacity-60"
+                          title="点击重置密码"
+                        >
+                          {resettingId === user.id ? '重置中...' : user.phone}
+                        </button>
+                      ) : (
+                        '-'
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
@@ -214,6 +278,44 @@ export default function UsersManagementPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {resetResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-purple-100">
+            <h3 className="text-lg font-semibold text-gray-900">临时密码已生成</h3>
+            <p className="mt-2 text-sm text-gray-500">
+              此密码仅显示一次，请立即复制并告知用户。
+            </p>
+            <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div className="text-xs text-gray-500 mb-1">手机号</div>
+              <div className="text-sm font-medium text-gray-800">{resetResult.phone || '-'}</div>
+              <div className="text-xs text-gray-500 mt-3 mb-1">临时密码</div>
+              <div className="text-2xl font-mono tracking-widest text-purple-600">
+                {resetResult.password}
+              </div>
+              <div className="mt-3 text-xs text-gray-500">
+                有效期至：{new Date(resetResult.expiresAt).toLocaleString('zh-CN')}
+              </div>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleCopyPassword}
+                className="px-4 py-2 rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50"
+              >
+                复制密码
+              </button>
+              <button
+                type="button"
+                onClick={() => setResetResult(null)}
+                className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700"
+              >
+                完成
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -3,38 +3,55 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import ForcePasswordChangeModal from './ForcePasswordChangeModal';
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [isChecking, setIsChecking] = useState(true);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     const checkAuth = async () => {
-      // 公开页面，不需要验证
       if (pathname === '/login' || pathname === '/register') {
+        setIsChecking(false);
+        setMustChangePassword(false);
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('must_change_password')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('获取用户状态失败:', profileError);
+        }
+        setMustChangePassword(false);
         setIsChecking(false);
         return;
       }
 
-      // 检查用户是否已登录
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        // 未登录，重定向到登录页
-        router.push('/login');
-      } else {
-        setIsChecking(false);
-      }
+      setMustChangePassword(Boolean(profile?.must_change_password));
+      setIsChecking(false);
     };
 
     checkAuth();
 
-    // 监听认证状态变化
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') {
         router.push('/login');
+        setMustChangePassword(false);
       } else if (event === 'SIGNED_IN') {
         setIsChecking(false);
       }
@@ -45,12 +62,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     };
   }, [pathname, router, supabase]);
 
-  // 公开页面直接显示
   if (pathname === '/login' || pathname === '/register') {
     return <>{children}</>;
   }
 
-  // 正在检查认证状态
   if (isChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -62,5 +77,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <ForcePasswordChangeModal
+        open={mustChangePassword}
+        onSuccess={() => setMustChangePassword(false)}
+      />
+    </>
+  );
 }

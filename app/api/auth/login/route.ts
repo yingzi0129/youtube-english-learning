@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient, createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,6 +32,28 @@ export async function POST(request: NextRequest) {
     }
 
     // 返回用户信息
+    const adminClient = createAdminClient();
+    const { data: profile, error: profileError } = await adminClient
+      .from('profiles')
+      .select('must_change_password, temp_password_expires_at')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profileError) {
+      console.error('获取用户状态失败:', profileError);
+    }
+
+    if (profile?.must_change_password && profile.temp_password_expires_at) {
+      const expiresAt = new Date(profile.temp_password_expires_at);
+      if (Number.isFinite(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) {
+        await supabase.auth.signOut();
+        return NextResponse.json(
+          { error: '临时密码已过期，请联系管理员重置' },
+          { status: 401 }
+        );
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: '登录成功',
