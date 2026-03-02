@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useAdminToast } from '../../components/AdminToastProvider';
 
 type SubtitleRow = {
   id: string; // subtitles.id (uuid)
@@ -68,6 +69,7 @@ export default function VideoAnnotationsPage() {
   const [editing, setEditing] = useState<SubtitleRow | null>(null);
   const [draftPoints, setDraftPoints] = useState<LearningPoint[]>([]);
   const [saving, setSaving] = useState(false);
+  const { showToast } = useAdminToast();
 
   // AI mode toggle + model
   const [aiEnabled, setAiEnabled] = useState(true);
@@ -229,7 +231,7 @@ export default function VideoAnnotationsPage() {
         helperSentence: stripEmpty(data?.helperSentence),
       });
     } catch (e: any) {
-      alert(e?.message || 'AI 生成失败');
+      showToast('error', e?.message || 'AI 生成失败');
     } finally {
       setAiLoading((prev) => {
         const next = { ...prev };
@@ -313,8 +315,9 @@ export default function VideoAnnotationsPage() {
       );
 
       closeEditor();
+      showToast('success', '保存成功');
     } catch (e: any) {
-      alert(e?.message || '保存失败');
+      showToast('error', e?.message || '保存失败');
     } finally {
       setSaving(false);
     }

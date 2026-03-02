@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { getUserRole } from '@/lib/auth/permissions';
 import { getTrialContext } from '@/lib/auth/trial';
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
+import { isMainlandChina } from '@/lib/region';
+import { selectStorageUrl } from '@/lib/storage-urls';
 
 export default async function TrialPage() {
   const { isTrial } = await getTrialContext();
@@ -33,11 +36,18 @@ export default async function TrialPage() {
     .eq('is_trial', true)
     .order('published_at', { ascending: false });
 
+  const prefer = isMainlandChina(await headers()) ? 'cos' : 'r2';
+
   const videos = videosData?.map((video) => ({
     id: video.id,
     title: video.title,
     description: video.description,
-    thumbnail: video.thumbnail_url,
+    thumbnail: selectStorageUrl({
+      prefer,
+      primaryUrl: video.thumbnail_url,
+      cosUrl: video.thumbnail_url_cos,
+      r2Url: video.thumbnail_url_r2,
+    }) || video.thumbnail_url,
     duration: `${video.duration_minutes}分钟`,
     duration_minutes: video.duration_minutes,
     creator: video.creator_name,

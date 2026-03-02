@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useAdminToast } from '../components/AdminToastProvider';
 
 interface ContactInfo {
   id: string;
@@ -18,6 +19,7 @@ export default function ContactManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingContact, setEditingContact] = useState<ContactInfo | null>(null);
+  const { showToast } = useAdminToast();
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -42,7 +44,7 @@ export default function ContactManagementPage() {
       setContacts(data || []);
     } catch (error) {
       console.error('获取联系方式错误:', error);
-      alert('获取联系方式失败');
+      showToast('error', '获取联系方式失败');
     } finally {
       setIsLoading(false);
     }
@@ -62,7 +64,7 @@ export default function ContactManagementPage() {
           .eq('id', editingContact.id);
 
         if (error) throw error;
-        alert('更新成功');
+        showToast('success', '更新成功');
       } else {
         // 新增
         const { error } = await supabase
@@ -70,7 +72,7 @@ export default function ContactManagementPage() {
           .insert([formData]);
 
         if (error) throw error;
-        alert('添加成功');
+        showToast('success', '添加成功');
       }
 
       setShowModal(false);
@@ -85,7 +87,7 @@ export default function ContactManagementPage() {
       fetchContacts();
     } catch (error) {
       console.error('保存联系方式错误:', error);
-      alert('保存失败');
+      showToast('error', '保存失败');
     }
   };
 
@@ -112,11 +114,11 @@ export default function ContactManagementPage() {
         .eq('id', id);
 
       if (error) throw error;
-      alert('删除成功');
+      showToast('success', '删除成功');
       fetchContacts();
     } catch (error) {
       console.error('删除联系方式错误:', error);
-      alert('删除失败');
+      showToast('error', '删除失败');
     }
   };
 
@@ -132,7 +134,7 @@ export default function ContactManagementPage() {
       fetchContacts();
     } catch (error) {
       console.error('切换状态错误:', error);
-      alert('操作失败');
+      showToast('error', '操作失败');
     }
   };
 

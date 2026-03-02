@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useAdminToast } from '../components/AdminToastProvider';
 
 type TrialSettings = {
   notice_title: string;
@@ -29,6 +30,7 @@ export default function TrialManagementPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const { showToast } = useAdminToast();
 
   useEffect(() => {
     fetchData();
@@ -92,8 +94,11 @@ export default function TrialManagementPage() {
         );
 
       if (saveError) throw saveError;
+      showToast('success', '试用页设置已保存');
     } catch (err: any) {
-      setError(err.message || '保存失败');
+      const message = err.message || '保存失败';
+      setError(message);
+      showToast('error', message);
     } finally {
       setSaving(false);
     }
@@ -116,7 +121,9 @@ export default function TrialManagementPage() {
       setVideos((prev) =>
         prev.map((item) => (item.id === video.id ? { ...item, is_trial: video.is_trial } : item))
       );
-      setError(err.message || '更新失败');
+      const message = err.message || '更新失败';
+      setError(message);
+      showToast('error', message);
     }
   };
 

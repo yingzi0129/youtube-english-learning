@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useAdminToast } from '../components/AdminToastProvider';
 
 interface ActivationCode {
   id: string;
@@ -21,6 +22,7 @@ export default function ActivationCodesPage() {
   const [error, setError] = useState('');
   const [count, setCount] = useState(10);
   const [filter, setFilter] = useState<'all' | 'used' | 'unused'>('all');
+  const { showToast } = useAdminToast();
 
   useEffect(() => {
     fetchCodes();
@@ -84,7 +86,9 @@ export default function ActivationCodesPage() {
 
   const generateCodes = async () => {
     if (count < 1 || count > 100) {
-      setError('生成数量必须在1-100之间');
+      const message = '生成数量必须在 1-100 之间';
+      setError(message);
+      showToast('error', message);
       return;
     }
 
@@ -113,8 +117,11 @@ export default function ActivationCodesPage() {
       // 刷新列表
       await fetchCodes();
       setCount(10);
+      showToast('success', '激活码生成成功');
     } catch (err: any) {
-      setError(err.message || '生成失败，请重试');
+      const message = err.message || '生成失败，请重试';
+      setError(message);
+      showToast('error', message);
     } finally {
       setGenerating(false);
     }
@@ -131,7 +138,7 @@ export default function ActivationCodesPage() {
 
   const copyCode = (code: string) => {
     navigator.clipboard.writeText(code);
-    alert('激活码已复制到剪贴板');
+    showToast('success', '激活码已复制到剪贴板');
   };
 
   const exportCodes = () => {

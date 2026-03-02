@@ -1,6 +1,9 @@
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { isTrialUser } from '@/lib/auth/trial';
+import { isMainlandChina } from '@/lib/region';
+import { selectStorageUrl } from '@/lib/storage-urls';
 import VideoWithSubtitles from './components/VideoWithSubtitles';
 import VideoInfo from './components/VideoInfo';
 
@@ -44,10 +47,13 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
 
   // 格式化视频数据
   // 确保视频 URL 使用 HTTPS 协议，避免混合内容错误
-  let videoUrl = videoData.video_url;
-  if (videoUrl && videoUrl.startsWith('http://')) {
-    videoUrl = videoUrl.replace('http://', 'https://');
-  }
+  const prefer = isMainlandChina(await headers()) ? 'cos' : 'r2';
+  const videoUrl = selectStorageUrl({
+    prefer,
+    primaryUrl: videoData.video_url,
+    cosUrl: videoData.video_url_cos,
+    r2Url: videoData.video_url_r2,
+  }) || videoData.video_url;
 
   const video = {
     id: videoData.id,

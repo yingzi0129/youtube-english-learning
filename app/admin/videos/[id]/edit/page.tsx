@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useAdminToast } from '../../../components/AdminToastProvider';
 
 export default function EditVideoPage() {
   const router = useRouter();
   const params = useParams();
   const videoId = params.id as string;
+  const { showToast } = useAdminToast();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -94,11 +96,14 @@ export default function EditVideoPage() {
       if (dbError) throw dbError;
 
       // 成功后跳转
+      showToast('success', '视频已更新');
       router.push('/admin/videos');
       router.refresh();
     } catch (err: any) {
       console.error('保存失败:', err);
-      setError(err.message || '保存失败，请重试');
+      const message = err.message || '保存失败，请重试';
+      setError(message);
+      showToast('error', message);
     } finally {
       setSaving(false);
     }

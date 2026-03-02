@@ -2,6 +2,9 @@ import { ReactNode } from 'react';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth/permissions';
 import { redirect } from 'next/navigation';
+import { AdminToastProvider } from './components/AdminToastProvider';
+
+export const dynamic = 'force-dynamic';
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   // 获取当前用户信息
@@ -60,9 +63,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       </header>
 
       {/* 主内容区域 */}
-      <main className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
+      <AdminToastProvider>
+        <main className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {children}
+        </main>
+      </AdminToastProvider>
     </div>
   );
 }

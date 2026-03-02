@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useAdminToast } from '../components/AdminToastProvider';
 import Link from 'next/link';
 
 interface Video {
@@ -33,6 +34,7 @@ export default function SubtitlesManagementPage() {
   const [loading, setLoading] = useState(true);
   const [savingSubtitleId, setSavingSubtitleId] = useState<string | null>(null);
   const [playError, setPlayError] = useState<string>('');
+  const { showToast } = useAdminToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const stopTimerRef = useRef<number | null>(null);
 
@@ -167,7 +169,7 @@ export default function SubtitlesManagementPage() {
       );
     } catch (err: any) {
       console.error('保存点击偏移失败:', err);
-      alert(err?.message || '保存失败，请重试');
+      showToast('error', err?.message || '保存失败，请重试');
     } finally {
       setSavingSubtitleId(null);
     }

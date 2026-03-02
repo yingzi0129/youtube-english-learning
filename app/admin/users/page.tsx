@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useAdminToast } from '../components/AdminToastProvider';
 
 interface User {
   id: string;
@@ -19,6 +20,7 @@ export default function UsersManagementPage() {
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [resetResult, setResetResult] = useState<{ phone?: string; password: string; expiresAt: string } | null>(null);
   const [resetError, setResetError] = useState('');
+  const { showToast } = useAdminToast();
 
   useEffect(() => {
     fetchUsers();
@@ -67,9 +69,9 @@ export default function UsersManagementPage() {
 
       // 刷新列表
       await fetchUsers();
-      alert('角色更新成功');
+      showToast('success', '角色更新成功');
     } catch (err: any) {
-      alert('更新失败: ' + err.message);
+      showToast('error', `更新失败: ${err.message}`);
     }
   };
 
@@ -100,7 +102,9 @@ export default function UsersManagementPage() {
         expiresAt: data.expiresAt,
       });
     } catch (err: any) {
-      setResetError(err.message || '重置密码失败');
+      const message = err.message || '重置密码失败';
+      setResetError(message);
+      showToast('error', message);
     } finally {
       setResettingId(null);
     }
@@ -110,9 +114,9 @@ export default function UsersManagementPage() {
     if (!resetResult?.password) return;
     try {
       await navigator.clipboard.writeText(resetResult.password);
-      alert('临时密码已复制');
+      showToast('success', '临时密码已复制');
     } catch (err) {
-      alert('复制失败，请手动复制');
+      showToast('error', '复制失败，请手动复制');
     }
   };
 

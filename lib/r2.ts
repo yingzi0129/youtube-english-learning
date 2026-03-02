@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || '';
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || '';
@@ -56,4 +56,17 @@ export async function uploadToR2(
 
   await r2Client.send(command);
   return `${R2_DOMAIN}/${key}`;
+}
+
+export async function deleteFromR2(key: string): Promise<void> {
+  if (!R2_BUCKET || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_ACCOUNT_ID) {
+    throw new Error('R2 配置缺失，无法删除对象');
+  }
+
+  const command = new DeleteObjectCommand({
+    Bucket: R2_BUCKET,
+    Key: key,
+  });
+
+  await r2Client.send(command);
 }

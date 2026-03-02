@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isTrialUser } from '@/lib/auth/trial';
+import { isMainlandChina } from '@/lib/region';
+import { selectStorageUrl } from '@/lib/storage-urls';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +11,7 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     const isTrial = isTrialUser(user);
 
-    // 从数据库获取所有未删除的视频，按发布日期降序排列
+    // 从数据库获取所有未删除的视频，按发布时间倒序
     let query = supabase
       .from('videos')
       .select('*')
@@ -32,19 +34,23 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    // 格式化视频数据，确保与前端期望的格式一致
-    const formattedVideos = videos.map((video) => {
-      // 确保视频 URL 使用 HTTPS 协议，避免混合内容错误
-      let videoUrl = video.video_url;
-      if (videoUrl && videoUrl.startsWith('http://')) {
-        videoUrl = videoUrl.replace('http://', 'https://');
-      }
+    const prefer = isMainlandChina(request.headers) ? 'cos' : 'r2';
 
-      // 确保缩略图 URL 也使用 HTTPS
-      let thumbnailUrl = video.thumbnail_url;
-      if (thumbnailUrl && thumbnailUrl.startsWith('http://')) {
-        thumbnailUrl = thumbnailUrl.replace('http://', 'https://');
-      }
+    // 格式化视频数据，确保返回格式一致
+    const formattedVideos = videos.map((video) => {
+      const videoUrl = selectStorageUrl({
+        prefer,
+        primaryUrl: video.video_url,
+        cosUrl: video.video_url_cos,
+        r2Url: video.video_url_r2,
+      });
+
+      const thumbnailUrl = selectStorageUrl({
+        prefer,
+        primaryUrl: video.thumbnail_url,
+        cosUrl: video.thumbnail_url_cos,
+        r2Url: video.thumbnail_url_r2,
+      });
 
       return {
         id: video.id,
@@ -60,7 +66,7 @@ export async function GET(request: NextRequest) {
           month: 'numeric',
           day: 'numeric',
         }).replace(/\//g, '/'),
-        videoUrl: videoUrl,
+        videoUrl,
       };
     });
 
@@ -72,9 +78,9 @@ export async function GET(request: NextRequest) {
     response.headers.set('Vary', 'Cookie');
     return response;
   } catch (error) {
-    console.error('服务器错误:', error);
+    console.error('服务端错误:', error);
     const response = NextResponse.json(
-      { error: '服务器错误，请稍后重试' },
+      { error: '服务端错误，请稍后重试' },
       { status: 500 }
     );
     response.headers.set('Cache-Control', 'no-store');

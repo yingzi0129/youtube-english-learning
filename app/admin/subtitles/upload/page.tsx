@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useAdminToast } from '../../components/AdminToastProvider';
 
 interface SubtitleItem {
   sequence: number;
@@ -23,6 +24,7 @@ export default function UploadSubtitlesPage() {
   const [fileContent, setFileContent] = useState('');
   const [fileType, setFileType] = useState<'json' | 'text'>('text');
   const [previewData, setPreviewData] = useState<SubtitleItem[]>([]);
+  const { showToast } = useAdminToast();
 
   useEffect(() => {
     if (videoId) {
@@ -254,11 +256,14 @@ export default function UploadSubtitlesPage() {
       if (insertError) throw insertError;
 
       // 成功后跳转
+      showToast('success', '字幕上传成功');
       router.push(`/admin/subtitles?video_id=${videoId}`);
       router.refresh();
     } catch (err: any) {
       console.error('上传失败:', err);
-      setError(err.message || '上传失败，请重试');
+      const message = err.message || '上传失败，请重试';
+      setError(message);
+      showToast('error', message);
     } finally {
       setLoading(false);
     }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useAdminToast } from '../../../components/AdminToastProvider';
 
 type SubtitleRow = {
   id: string;
@@ -24,6 +25,7 @@ export default function EditSubtitlePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>('');
   const [subtitle, setSubtitle] = useState<SubtitleRow | null>(null);
+  const { showToast } = useAdminToast();
 
   const backHref = useMemo(() => {
     if (!subtitle?.video_id) return '/admin/subtitles';
@@ -76,11 +78,14 @@ export default function EditSubtitlePage() {
 
       if (error) throw error;
 
+      showToast('success', '字幕已保存');
       router.push(backHref);
       router.refresh();
     } catch (e: any) {
       // If the DB hasn't been migrated yet, PostgREST will error here.
-      setError(e?.message || '保存失败');
+      const message = e?.message || '保存失败';
+      setError(message);
+      showToast('error', message);
     } finally {
       setSaving(false);
     }

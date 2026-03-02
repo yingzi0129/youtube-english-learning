@@ -2,10 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { useAdminToast } from '../../components/AdminToastProvider';
+
+type StorageOption = 'r2' | 'cos';
 
 export default function NewVideoPage() {
   const router = useRouter();
+  const { showToast } = useAdminToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -17,9 +20,11 @@ export default function NewVideoPage() {
     duration_minutes: 0,
     tags: '',
     topics: '',
-    video_url: '',
-    thumbnail_url: '',
   });
+
+  const [primaryStorage, setPrimaryStorage] = useState<StorageOption>('r2');
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,36 +32,42 @@ export default function NewVideoPage() {
     setError('');
 
     try {
-      const supabase = createClient();
-
-      // 验证必填字段
-      if (!formData.video_url) {
-        throw new Error('请填写视频URL');
+      if (!videoFile) {
+        throw new Error('请选择视频文件');
       }
 
-      // 保存视频信息到数据库
-      const { error: dbError } = await supabase.from('videos').insert({
-        title: formData.title,
-        description: formData.description,
-        creator_name: formData.creator_name,
-        difficulty: formData.difficulty,
-        duration_minutes: formData.duration_minutes,
-        video_url: formData.video_url,
-        thumbnail_url: formData.thumbnail_url || null,
-        tags: formData.tags ? formData.tags.split(',').map(t => t.trim()) : [],
-        topics: formData.topics ? formData.topics.split(',').map(t => t.trim()) : [],
-        published_at: new Date().toISOString(),
-        is_deleted: false,
+      const payload = new FormData();
+      payload.append('video', videoFile);
+      if (thumbnailFile) {
+        payload.append('thumbnail', thumbnailFile);
+      }
+      payload.append('primaryStorage', primaryStorage);
+      payload.append('title', formData.title);
+      payload.append('description', formData.description);
+      payload.append('creator_name', formData.creator_name);
+      payload.append('difficulty', formData.difficulty);
+      payload.append('duration_minutes', String(formData.duration_minutes || 0));
+      payload.append('tags', formData.tags || '');
+      payload.append('topics', formData.topics || '');
+
+      const response = await fetch('/api/admin/videos/upload', {
+        method: 'POST',
+        body: payload,
       });
 
-      if (dbError) throw dbError;
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result?.error || '上传失败');
+      }
 
-      // 成功后跳转
+      showToast('success', '视频上传成功');
       router.push('/admin/videos');
       router.refresh();
     } catch (err: any) {
       console.error('保存失败:', err);
-      setError(err.message || '保存失败，请重试');
+      const message = err.message || '保存失败，请重试';
+      setError(message);
+      showToast('error', message);
     } finally {
       setLoading(false);
     }
@@ -79,35 +90,50 @@ export default function NewVideoPage() {
 
       {/* 表单 */}
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
-        {/* 视频URL */}
+        {/* 视频文件 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            视频URL <span className="text-red-500">*</span>
+            视频文件 <span className="text-red-500">*</span>
           </label>
           <input
-            type="url"
-            value={formData.video_url}
-            onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-            placeholder="https://example.com/video.mp4"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            type="file"
+            accept="video/*"
+            onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
+            className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
             required
           />
-          <p className="mt-1 text-sm text-gray-500">请输入视频文件的完整URL地址</p>
+          <p className="mt-1 text-sm text-gray-500">上传一次，系统将自动同步到双存储（非阻塞）。</p>
         </div>
 
-        {/* 缩略图URL */}
+        {/* 缩略图 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            缩略图URL
+            缩略图（可选）
           </label>
           <input
-            type="url"
-            value={formData.thumbnail_url}
-            onChange={(e) => setFormData({ ...formData, thumbnail_url: e.target.value })}
-            placeholder="https://example.com/thumbnail.jpg"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            type="file"
+            accept="image/*"
+            onChange={(e) => setThumbnailFile(e.target.files?.[0] || null)}
+            className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
           />
-          <p className="mt-1 text-sm text-gray-500">请输入缩略图的完整URL地址（可选）</p>
+          <p className="mt-1 text-sm text-gray-500">建议上传清晰横向封面图。</p>
+        </div>
+
+        {/* 主存储选择 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            主存储选择 <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={primaryStorage}
+            onChange={(e) => setPrimaryStorage(e.target.value as StorageOption)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            required
+          >
+            <option value="r2">R2（海外）</option>
+            <option value="cos">COS（国内）</option>
+          </select>
+          <p className="mt-1 text-sm text-gray-500">将先上传到主存储，另一份后台异步补齐。</p>
         </div>
 
         {/* 标题 */}
