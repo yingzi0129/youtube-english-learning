@@ -38,7 +38,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
                 <NavLink href="/admin" icon="home">概览</NavLink>
                 <NavLink href="/admin/videos" icon="video">视频管理</NavLink>
                 <NavLink href="/admin/subtitles" icon="subtitle">字幕管理</NavLink>
-                <NavLink href="/admin/contact" icon="contact">联系方式</NavLink>
+                <NavLink href="/admin/contact" icon="contact">信息提醒</NavLink>
                 <NavLink href="/admin/activation-codes" icon="code">激活码</NavLink>
                 <NavLink href="/admin/trial" icon="trial">试用页</NavLink>
                 <NavLink href="/admin/users" icon="users">用户管理</NavLink>

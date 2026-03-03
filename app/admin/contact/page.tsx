@@ -163,14 +163,14 @@ export default function ContactManagementPage() {
       {/* 页面标题 */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">联系方式管理</h1>
-          <p className="text-gray-600 mt-1">管理网站的联系方式信息</p>
+          <h1 className="text-2xl font-bold text-gray-900">信息提醒管理</h1>
+          <p className="text-gray-600 mt-1">管理网站的信息提醒内容</p>
         </div>
         <button
           onClick={openAddModal}
           className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:shadow-lg transition-all"
         >
-          + 添加联系方式
+          + 添加信息提醒
         </button>
       </div>
 
@@ -243,7 +243,7 @@ export default function ContactManagementPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">
-              {editingContact ? '编辑联系方式' : '添加联系方式'}
+              {editingContact ? '编辑信息提醒' : '添加信息提醒'}
             </h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -311,7 +311,7 @@ export default function ContactManagementPage() {
                   className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                 />
                 <label htmlFor="is_active" className="ml-2 text-sm text-gray-700">
-                  启用此联系方式
+                  启用此信息提醒
                 </label>
               </div>
 

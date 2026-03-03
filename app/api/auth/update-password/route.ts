@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,7 +41,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { error: profileError } = await supabase
+    // 使用管理员客户端更新 profiles 表（绕过 RLS）
+    const adminClient = createAdminClient();
+    const { error: profileError } = await adminClient
       .from('profiles')
       .update({
         must_change_password: false,
@@ -53,10 +55,19 @@ export async function POST(request: NextRequest) {
     if (profileError) {
       console.error('更新用户状态失败:', profileError);
       return NextResponse.json(
-        { error: '更新密码失败' },
+        { error: '更新用户状态失败' },
         { status: 500 }
       );
     }
+
+    // 验证更新是否成功
+    const { data: updatedProfile } = await adminClient
+      .from('profiles')
+      .select('must_change_password')
+      .eq('id', user.id)
+      .single();
+
+    console.log('密码更新成功，用户状态:', updatedProfile);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

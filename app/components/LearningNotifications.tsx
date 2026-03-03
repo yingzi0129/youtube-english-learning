@@ -63,7 +63,7 @@ export default function ContactInfoCard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
           </div>
-          <h2 className="text-base font-bold text-gray-900">联系方式</h2>
+          <h2 className="text-base font-bold text-gray-900">信息提醒</h2>
         </div>
       </div>
 
@@ -87,12 +87,12 @@ export default function ContactInfoCard() {
           {contactList.map((contact) => (
             <div
               key={contact.id}
-              className="bg-gradient-to-br from-blue-50 to-purple-50 border-l-4 border-purple-500 p-5 rounded-2xl"
+              className="bg-gradient-to-br from-blue-50 to-purple-50 border-l-4 border-purple-500 p-4 rounded-2xl hover:shadow-md transition-shadow"
             >
               <div className="flex items-start gap-3">
-                <div className="text-3xl">{contact.icon}</div>
+                <div className="text-xl flex-shrink-0">{contact.icon}</div>
                 <div className="flex-1">
-                  <h3 className="text-sm font-bold text-gray-900 mb-2">{contact.title}</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1.5">{contact.title}</h3>
                   <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
                     {contact.content}
                   </p>

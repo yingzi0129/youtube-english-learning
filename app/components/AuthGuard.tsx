@@ -12,39 +12,49 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const supabase = createClient();
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      if (pathname === '/login' || pathname === '/register') {
-        setIsChecking(false);
-        setMustChangePassword(false);
-        return;
-      }
-
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        router.push('/login');
-        return;
-      }
-
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('must_change_password')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('获取用户状态失败:', profileError);
-        }
-        setMustChangePassword(false);
-        setIsChecking(false);
-        return;
-      }
-
-      setMustChangePassword(Boolean(profile?.must_change_password));
+  const checkAuth = async () => {
+    if (pathname === '/login' || pathname === '/register') {
       setIsChecking(false);
-    };
+      setMustChangePassword(false);
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    // 添加时间戳避免缓存，并使用 single() 确保获取最新数据
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('must_change_password')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('获取用户状态失败:', profileError);
+      }
+      setMustChangePassword(false);
+      setIsChecking(false);
+      return;
+    }
+
+    console.log('查询到的用户状态:', profile);
+    setMustChangePassword(Boolean(profile?.must_change_password));
+    setIsChecking(false);
+  };
+
+  const handlePasswordChangeSuccess = async () => {
+    console.log('密码修改成功回调，重新检查用户状态');
+    // 重新检查用户状态，确保数据库更新生效
+    setIsChecking(true);
+    await checkAuth();
+  };
+
+  useEffect(() => {
 
     checkAuth();
 
@@ -82,7 +92,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       {children}
       <ForcePasswordChangeModal
         open={mustChangePassword}
-        onSuccess={() => setMustChangePassword(false)}
+        onSuccess={handlePasswordChangeSuccess}
       />
     </>
   );

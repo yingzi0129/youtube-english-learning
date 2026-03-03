@@ -15,6 +15,7 @@ export default function ForcePasswordChangeModal({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   if (!open) {
     return null;
@@ -54,9 +55,17 @@ export default function ForcePasswordChangeModal({
         throw new Error(data.error || '更新密码失败');
       }
 
+      console.log('密码修改成功，API 返回:', data);
+
       setPassword('');
       setConfirmPassword('');
-      onSuccess();
+      setSuccess(true);
+
+      // 显示成功提示后延迟关闭弹窗
+      setTimeout(() => {
+        setSuccess(false);
+        onSuccess();
+      }, 1500);
     } catch (err: any) {
       setError(err.message || '更新密码失败');
     } finally {
@@ -75,6 +84,12 @@ export default function ForcePasswordChangeModal({
         {error && (
           <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-600">
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-600">
+            ✓ 密码修改成功！
           </div>
         )}
 
