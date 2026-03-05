@@ -89,7 +89,7 @@ export default function SubtitlePanel({
 
   // Cloze (fill-in) mode: mask all annotated learning points until revealed by click.
   // Keyed by `${subtitleId}:${learningPointId}` to avoid collisions across subtitles.
-  const [revealed, setRevealed] = useState<Record<string, true>>({});
+  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
 
   // Word card popover state (desktop-focused; uses a portal to avoid clipping).
   const [cardPoint, setCardPoint] = useState<LearningPoint | null>(null);
@@ -99,6 +99,7 @@ export default function SubtitlePanel({
   const cardRef = useRef<HTMLDivElement>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const showPronunciationButton = false;
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     // Portal requires DOM.
@@ -211,9 +212,16 @@ export default function SubtitlePanel({
     return !!revealed[getRevealKey(subtitleId, pointId)];
   };
 
-  const revealPoint = (subtitleId: number, pointId: string) => {
+  const toggleRevealPoint = (subtitleId: number, pointId: string) => {
     const key = getRevealKey(subtitleId, pointId);
-    setRevealed((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
+    setRevealed((prev) => {
+      if (prev[key]) {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      }
+      return { ...prev, [key]: true };
+    });
   };
 
   const showCard = (point: LearningPoint, anchorEl: HTMLElement) => {
@@ -240,6 +248,54 @@ export default function SubtitlePanel({
     utter.onerror = () => setIsSpeaking(false);
     setIsSpeaking(true);
     synth.speak(utter);
+  };
+
+  const getDownloadFilename = (contentDisposition: string | null) => {
+    if (!contentDisposition) return null;
+    const utf8Match = contentDisposition.match(/filename\*\=UTF-8''([^;]+)/i);
+    if (utf8Match?.[1]) {
+      try {
+        return decodeURIComponent(utf8Match[1]);
+      } catch {
+        return utf8Match[1];
+      }
+    }
+    const asciiMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
+    return asciiMatch?.[1] || null;
+  };
+
+  const handleExportSubtitles = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const response = await fetch(`/api/videos/${videoId}/export-subtitles`);
+      if (!response.ok) {
+        let errorMessage = '导出失败，请稍后重试';
+        try {
+          const data = await response.json();
+          if (data?.error) errorMessage = data.error;
+        } catch {
+          // ignore
+        }
+        throw new Error(errorMessage);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const filename = getDownloadFilename(response.headers.get('content-disposition')) || '字幕.docx';
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      console.error(error);
+      window.alert(error?.message || '导出失败，请稍后重试');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   useEffect(() => {
@@ -303,8 +359,8 @@ export default function SubtitlePanel({
             e.stopPropagation();
             const target = e.currentTarget as unknown as HTMLElement;
 
-            if (isClozeMode && !revealedNow) {
-              revealPoint(subtitleId, p.id);
+            if (isClozeMode) {
+              toggleRevealPoint(subtitleId, p.id);
               return;
             }
 
@@ -329,7 +385,7 @@ export default function SubtitlePanel({
     return nodes;
   };
 
-  // 自动滚动字幕列表：当激活字幕靠近底部/不在可视区域时，将其滚动到列表顶部位置
+  // 自动滚动字幕列表：当激活字幕靠近底部不在可视区域时，将其滚动到列表顶部位置
   useEffect(() => {
     if (activeSubtitleId == null) return;
 
@@ -379,6 +435,8 @@ export default function SubtitlePanel({
   const [showPracticeMenu, setShowPracticeMenu] = useState(false);
   // 存储已有的录音记录
   const [existingRecordings, setExistingRecordings] = useState<Record<number, string>>({});
+  // Tab 切换状态（仅桌面端使用）
+  const [activeTab, setActiveTab] = useState<'subtitle' | 'loop' | 'practice'>('subtitle');
 
   // 加载已有的录音记录
   useEffect(() => {
@@ -440,344 +498,503 @@ export default function SubtitlePanel({
   return (
     <React.Fragment>
       <div className="bg-white/90 backdrop-blur-md rounded-3xl shadow-lg border border-purple-100/50 overflow-hidden lg:sticky lg:top-24">
-      {/* 标题和功能图标 */}
-      <div className="hidden lg:block px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
-        <div className="flex items-center justify-between mb-2 lg:mb-3">
-          <h2 className="text-base lg:text-lg font-bold text-gray-900 flex items-center gap-2">
-            <svg className="w-4 h-4 lg:w-5 lg:h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-            </svg>
-            动态字幕
-          </h2>
 
-          {/* 功能图标按钮组 */}
-          <div className="flex items-center gap-1.5 lg:gap-2">
-            {/* 循环播放图标 */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setShowLoopMenu(!showLoopMenu);
-                  setShowPracticeMenu(false);
-                }}
-                className="w-8 h-8 lg:w-9 lg:h-9 rounded-lg bg-white hover:bg-purple-50 flex items-center justify-center transition-colors shadow-sm border border-purple-100"
-                title="循环播放"
-              >
-                <svg className="w-4 h-4 lg:w-5 lg:h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>
-
-              {/* 循环播放下拉菜单 */}
-              {showLoopMenu && (
-                <div className="absolute top-full right-0 mt-2 w-56 lg:w-64 bg-white rounded-xl shadow-lg border border-purple-100 py-2 z-20">
-                  {/* 视频循环模式 */}
-                  <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">视频循环</div>
-                  <button
-                    onClick={() => {
-                      onVideoLoopModeChange('single');
-                      setShowLoopMenu(false);
-                    }}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center justify-between ${
-                      videoLoopMode === 'single' ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-700 hover:bg-purple-50'
-                    }`}
-                  >
-                    <span>单集播放</span>
-                    {videoLoopMode === 'single' && <span className="text-purple-600">✓</span>}
-                  </button>
-                  <button
-                    onClick={() => {
-                      onVideoLoopModeChange('loop');
-                      setShowLoopMenu(false);
-                    }}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center justify-between ${
-                      videoLoopMode === 'loop' ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-700 hover:bg-purple-50'
-                    }`}
-                  >
-                    <span>单集循环</span>
-                    {videoLoopMode === 'loop' && <span className="text-purple-600">✓</span>}
-                  </button>
-
-                  <div className="border-t border-gray-200 my-2"></div>
-
-                  {/* 句子循环模式 */}
-                  <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">句子循环</div>
-                  <button
-                    onClick={() => {
-                      onSentenceLoopModeChange('continuous');
-                      setShowLoopMenu(false);
-                    }}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center justify-between ${
-                      sentenceLoopMode === 'continuous' ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-700 hover:bg-purple-50'
-                    }`}
-                  >
-                    <span>连续播放</span>
-                    {sentenceLoopMode === 'continuous' && <span className="text-purple-600">✓</span>}
-                  </button>
-                  <button
-                    onClick={() => {
-                      onSentenceLoopModeChange('single');
-                    }}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center justify-between ${
-                      sentenceLoopMode === 'single' ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-700 hover:bg-purple-50'
-                    }`}
-                  >
-                    <span>单句循环</span>
-                    {sentenceLoopMode === 'single' && <span className="text-purple-600">✓</span>}
-                  </button>
-
-                  {/* 循环次数选择（仅在单句循环模式下显示） */}
-                  {sentenceLoopMode === 'single' && (
-                    <>
-                      <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase mt-2">循环次数</div>
-                      {[1, 2, 3, -1].map((count) => (
-                        <button
-                          key={count}
-                          onClick={() => {
-                            onLoopCountChange(count as LoopCount);
-                            setShowLoopMenu(false);
-                          }}
-                          className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center justify-between ${
-                            loopCount === count ? 'bg-purple-50 text-purple-700 font-medium' : 'text-gray-700 hover:bg-purple-50'
-                          }`}
-                        >
-                          <span>{count === -1 ? '无限循环' : `${count} 次`}</span>
-                          {loopCount === count && <span className="text-purple-600">✓</span>}
-                        </button>
-                      ))}
-
-                      <div className="border-t border-gray-200 my-2"></div>
-
-                      {/* 自动下一句开关 */}
-                      <button
-                        onClick={() => {
-                          onAutoNextSentenceChange(!autoNextSentence);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-center justify-between"
-                      >
-                        <span>自动下一句</span>
-                        <div className={`w-10 h-5 rounded-full transition-colors ${autoNextSentence ? 'bg-purple-600' : 'bg-gray-300'}`}>
-                          <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform mt-0.5 ${autoNextSentence ? 'ml-5' : 'ml-0.5'}`}></div>
-                        </div>
-                      </button>
-
-                      {/* 当前循环次数显示 */}
-                      {loopCount !== -1 && (
-                        <div className="px-4 py-2 text-xs text-gray-500 bg-purple-50 mt-2">
-                          当前循环：第 {currentLoopIndex + 1} / {loopCount} 次
-                        </div>
-                      )}
-                      {loopCount === -1 && (
-                        <div className="px-4 py-2 text-xs text-gray-500 bg-purple-50 mt-2">
-                          当前循环：第 {currentLoopIndex + 1} 次
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* 英语练习图标 */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setShowPracticeMenu(!showPracticeMenu);
-                  setShowLoopMenu(false);
-                }}
-                className="w-8 h-8 lg:w-9 lg:h-9 rounded-lg bg-white hover:bg-purple-50 flex items-center justify-center transition-colors shadow-sm border border-purple-100"
-                title="英语练习"
-              >
-                <svg className="w-4 h-4 lg:w-5 lg:h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </button>
-
-              {/* 英语练习下拉菜单 */}
-              {showPracticeMenu && (
-                <div className="absolute top-full right-0 mt-2 w-36 lg:w-40 bg-white rounded-xl shadow-lg border border-purple-100 py-2 z-20">
-                  <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
-                    英语练习
-                  </div>
-                  <button
-                    onClick={() => {
-                      onPracticeModeChange(!isPracticeMode);
-                      setShowPracticeMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-center justify-between"
-                  >
-                    <span>跟读练习</span>
-                    {isPracticeMode && <span className="text-purple-600">✓</span>}
-                  </button>
-                  <button
-                    onClick={() => {
-                      onClozeModeChange(!isClozeMode);
-                      setShowPracticeMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 transition-colors flex items-center justify-between"
-                  >
-                    <span>填空练习</span>
-                    {isClozeMode && <span className="text-purple-600">✓</span>}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* 语言切换按钮 - 只在电脑端显示 */}
-        <div className="hidden lg:flex items-center gap-1.5 lg:gap-2">
-          <button
-            onClick={() => onSubtitleModeChange('bilingual')}
-            className={`px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-lg text-xs lg:text-sm font-medium transition-all ${
-              subtitleMode === 'bilingual'
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'bg-white text-gray-700 hover:bg-purple-50 border border-gray-200'
-            }`}
-          >
-            双语
-          </button>
-          <button
-            onClick={() => onSubtitleModeChange('chinese')}
-            className={`px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-lg text-xs lg:text-sm font-medium transition-all ${
-              subtitleMode === 'chinese'
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'bg-white text-gray-700 hover:bg-purple-50 border border-gray-200'
-            }`}
-          >
-            中文
-          </button>
-          <button
-            onClick={() => onSubtitleModeChange('english')}
-            className={`px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-lg text-xs lg:text-sm font-medium transition-all ${
-              subtitleMode === 'english'
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'bg-white text-gray-700 hover:bg-purple-50 border border-gray-200'
-            }`}
-          >
-            英文
-          </button>
-        </div>
+      {/* 桌面端：Tab 标签导航 */}
+      <div className="hidden lg:flex bg-white/90 backdrop-blur-md border-b-2 border-gray-200">
+        <button
+          onClick={() => setActiveTab('subtitle')}
+          className={`
+            flex-1 flex items-center justify-center gap-2 px-4 py-4 transition-all text-sm font-medium
+            ${activeTab === 'subtitle'
+              ? 'text-purple-600 bg-gradient-to-r from-purple-50 to-pink-50 border-b-3 border-purple-600'
+              : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50/50'
+            }
+          `}
+          style={activeTab === 'subtitle' ? { borderBottom: '3px solid rgb(147 51 234)' } : {}}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+          </svg>
+          <span>字幕</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('loop')}
+          className={`
+            flex-1 flex items-center justify-center gap-2 px-4 py-4 transition-all text-sm font-medium
+            ${activeTab === 'loop'
+              ? 'text-purple-600 bg-gradient-to-r from-purple-50 to-pink-50 border-b-3 border-purple-600'
+              : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50/50'
+            }
+          `}
+          style={activeTab === 'loop' ? { borderBottom: '3px solid rgb(147 51 234)' } : {}}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>循环</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('practice')}
+          className={`
+            flex-1 flex items-center justify-center gap-2 px-4 py-4 transition-all text-sm font-medium
+            ${activeTab === 'practice'
+              ? 'text-purple-600 bg-gradient-to-r from-purple-50 to-pink-50 border-b-3 border-purple-600'
+              : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50/50'
+            }
+          `}
+          style={activeTab === 'practice' ? { borderBottom: '3px solid rgb(147 51 234)' } : {}}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <span>练习</span>
+        </button>
       </div>
 
-      {/* 字幕列表 */}
-      <div
-        ref={subtitleListRef}
-        className={`p-3 lg:p-4 space-y-2 lg:space-y-3 lg:h-[600px] lg:overflow-y-auto ${
-        themeMode === 'dark' ? 'bg-gray-900' : ''
-      }`}
-      >
-        {subtitles.map((subtitle) => {
-          const isActive = subtitle.id === activeSubtitleId;
+      {/* 移动端：简化的标题（移除功能图标） */}
+      <div className="lg:hidden px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
+        <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+          <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+          </svg>
+          动态字幕
+        </h2>
+      </div>
+      {/* 桌面端：Tab 内容区域 */}
+      {/* 字幕 Tab */}
+      {activeTab === 'subtitle' && (
+        <div className="hidden lg:block">
+          {/* 语言切换按钮 */}
+          <div className="px-4 lg:px-6 py-3 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onSubtitleModeChange('bilingual')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  subtitleMode === 'bilingual'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-purple-50 border border-gray-200'
+                }`}
+              >
+                双语
+              </button>
+              <button
+                onClick={() => onSubtitleModeChange('chinese')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  subtitleMode === 'chinese'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-purple-50 border border-gray-200'
+                }`}
+              >
+                中文
+              </button>
+              <button
+                onClick={() => onSubtitleModeChange('english')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  subtitleMode === 'english'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-purple-50 border border-gray-200'
+                }`}
+              >
+                英文
+              </button>
+              <button
+                onClick={handleExportSubtitles}
+                disabled={isExporting}
+                className="ml-auto px-3 py-1.5 rounded-lg text-sm font-medium border border-purple-200 text-purple-600 bg-white hover:bg-purple-50 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isExporting ? '导出中...' : '导出字幕'}
+              </button>
+            </div>
+          </div>
 
-          return (
-            <div
-              key={subtitle.id}
-              data-subtitle-id={subtitle.id}
-              className={`
-                p-3 lg:p-4 rounded-xl lg:rounded-2xl border-2 transition-all duration-300 cursor-pointer
-                ${
-                  isActive
-                    ? themeMode === 'dark'
-                      ? 'bg-yellow-900/30 border-yellow-600 shadow-md'
-                      : 'bg-yellow-50 border-yellow-400 shadow-md'
-                    : themeMode === 'dark'
-                    ? 'bg-gray-800 border-gray-700 hover:border-purple-500 hover:shadow-sm'
-                    : 'bg-white border-gray-200 hover:border-purple-300 hover:shadow-sm'
-                }
-              `}
-              onClick={() => handleSubtitleClick(subtitle.id, subtitle.startTime)}
-            >
-              {/* 时间戳 */}
-              <div className="flex items-center gap-2 mb-2">
-                <span
+          {/* 字幕列表 */}
+          <div
+            ref={subtitleListRef}
+            className="p-4 space-y-3 h-[600px] overflow-y-auto"
+          >
+            {subtitles.map((subtitle) => {
+              const isActive = subtitle.id === activeSubtitleId;
+
+              return (
+                <div
+                  key={subtitle.id}
+                  data-subtitle-id={subtitle.id}
                   className={`
-                    text-xs font-bold px-2 py-0.5 lg:py-1 rounded-full
-                    ${isActive
-                      ? themeMode === 'dark'
-                        ? 'bg-yellow-900 text-yellow-300'
-                        : 'bg-yellow-200 text-yellow-800'
-                      : themeMode === 'dark'
-                      ? 'bg-gray-700 text-gray-300'
-                      : 'bg-gray-100 text-gray-600'
+                    p-4 rounded-2xl border-2 transition-all duration-300 cursor-pointer
+                    ${
+                      isActive
+                        ? 'bg-yellow-50 border-yellow-400 shadow-md'
+                        : 'bg-white border-gray-200 hover:border-purple-300 hover:shadow-sm'
                     }
                   `}
+                  onClick={() => handleSubtitleClick(subtitle.id, subtitle.startTime)}
                 >
-                  {formatTime(subtitle.startTime)}
-                </span>
-                {isActive && (
-                  <span className={`flex items-center gap-1 text-xs font-semibold ${
-                    themeMode === 'dark' ? 'text-yellow-400' : 'text-yellow-700'
-                  }`}>
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                    </svg>
-                    播放中
-                  </span>
-                )}
+                  {/* 时间戳*/}
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      className={`
+                        text-xs font-bold px-2 py-1 rounded-full
+                        ${isActive ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-100 text-gray-600'}
+                      `}
+                    >
+                      {formatTime(subtitle.startTime)}
+                    </span>
+                    {isActive && (
+                      <span className="flex items-center gap-1 text-xs font-semibold text-yellow-700">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                        </svg>
+                        播放中
+                      </span>
+                    )}
+                  </div>
+
+                  {/* 英文字幕 */}
+                  {(subtitleMode === 'bilingual' || subtitleMode === 'english') && (
+                    <p
+                      className={`
+                        leading-relaxed font-semibold
+                        ${subtitleMode === 'bilingual' ? 'mb-2' : ''}
+                        ${isActive ? 'text-gray-900' : 'text-gray-700'}
+                      `}
+                      style={{ fontSize: `${fontSize}px` }}
+                    >
+                      {renderAnnotatedEnglish(subtitle.id, subtitle.text, subtitle.annotations)}
+                    </p>
+                  )}
+
+                  {/* 中文翻译 */}
+                  {(subtitleMode === 'bilingual' || subtitleMode === 'chinese') && (
+                    <p
+                      className={`
+                        leading-relaxed
+                        ${subtitleMode === 'chinese' ? 'font-semibold' : ''}
+                        ${isActive ? 'text-gray-700' : 'text-gray-600'}
+                      `}
+                      style={{ fontSize: `${subtitleMode === 'bilingual' ? fontSize : fontSize - 2}px` }}
+                    >
+                      {subtitle.translation}
+                    </p>
+                  )}
+
+                  {/* 口语练习录音控件 */}
+                  {isPracticeMode && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <AudioRecorder
+                        videoId={videoId}
+                        subtitleId={subtitle.id}
+                        existingAudioUrl={existingRecordings[subtitle.id]}
+                        onRecordingComplete={(audioUrl) => handleRecordingComplete(subtitle.id, audioUrl)}
+                        subtitleStartTime={subtitle.startTime}
+                        subtitleEndTime={subtitle.endTime}
+                        onPlayOriginal={onPlayOriginal ? () => onPlayOriginal(subtitle.id) : undefined}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 循环 Tab */}
+      {activeTab === 'loop' && (
+        <div className="hidden lg:block">
+          <div className="p-6 space-y-4 h-[600px] overflow-y-auto">
+            {/* 视频循环模式 */}
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase mb-3">视频循环</div>
+              <div className="space-y-2">
+                <button
+                  onClick={() => onVideoLoopModeChange('single')}
+                  className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all flex items-center justify-between ${
+                    videoLoopMode === 'single'
+                      ? 'bg-purple-50 text-purple-700 font-medium border-2 border-purple-200'
+                      : 'bg-white text-gray-700 hover:bg-purple-50 border-2 border-gray-200'
+                  }`}
+                >
+                  <span>单集播放</span>
+                  {videoLoopMode === 'single' && <span className="text-purple-600 text-lg">✓</span>}
+                </button>
+                <button
+                  onClick={() => onVideoLoopModeChange('loop')}
+                  className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all flex items-center justify-between ${
+                    videoLoopMode === 'loop'
+                      ? 'bg-purple-50 text-purple-700 font-medium border-2 border-purple-200'
+                      : 'bg-white text-gray-700 hover:bg-purple-50 border-2 border-gray-200'
+                  }`}
+                >
+                  <span>单集循环</span>
+                  {videoLoopMode === 'loop' && <span className="text-purple-600 text-lg">✓</span>}
+                </button>
               </div>
+            </div>
 
-              {/* 英文字幕 */}
-              {(subtitleMode === 'bilingual' || subtitleMode === 'english') && (
-                <p
-                  className={`
-                    leading-relaxed
-                    font-semibold
-                    ${subtitleMode === 'bilingual' ? 'mb-2' : ''}
-                    ${isActive
-                      ? themeMode === 'dark'
-                        ? 'text-white'
-                        : 'text-gray-900'
-                      : themeMode === 'dark'
-                      ? 'text-gray-300'
-                      : 'text-gray-700'
-                    }
-                  `}
-                  style={{ fontSize: `${fontSize}px` }}
+            <div className="border-t border-gray-200 my-4"></div>
+
+            {/* 句子循环模式 */}
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase mb-3">句子循环</div>
+              <div className="space-y-2">
+                <button
+                  onClick={() => onSentenceLoopModeChange('continuous')}
+                  className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all flex items-center justify-between ${
+                    sentenceLoopMode === 'continuous'
+                      ? 'bg-purple-50 text-purple-700 font-medium border-2 border-purple-200'
+                      : 'bg-white text-gray-700 hover:bg-purple-50 border-2 border-gray-200'
+                  }`}
                 >
-                  {renderAnnotatedEnglish(subtitle.id, subtitle.text, subtitle.annotations)}
-                </p>
-              )}
+                  <span>连续播放</span>
+                  {sentenceLoopMode === 'continuous' && <span className="text-purple-600 text-lg">✓</span>}
+                </button>
+                <button
+                  onClick={() => onSentenceLoopModeChange('single')}
+                  className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all flex items-center justify-between ${
+                    sentenceLoopMode === 'single'
+                      ? 'bg-purple-50 text-purple-700 font-medium border-2 border-purple-200'
+                      : 'bg-white text-gray-700 hover:bg-purple-50 border-2 border-gray-200'
+                  }`}
+                >
+                  <span>单句循环</span>
+                  {sentenceLoopMode === 'single' && <span className="text-purple-600 text-lg">✓</span>}
+                </button>
+              </div>
+            </div>
 
-              {/* 中文翻译 */}
-              {(subtitleMode === 'bilingual' || subtitleMode === 'chinese') && (
-                <p
-                  className={`
-                    leading-relaxed
-                    ${subtitleMode === 'chinese' ? 'font-semibold' : ''}
-                    ${isActive
+            {/* 循环次数选择（仅在单句循环模式下显示）*/}
+            {sentenceLoopMode === 'single' && (
+              <>
+                <div className="border-t border-gray-200 my-4"></div>
+                <div>
+                  <div className="text-xs font-semibold text-gray-500 uppercase mb-3">循环次数</div>
+                  <div className="space-y-2">
+                    {[1, 2, 3, -1].map((count) => (
+                      <button
+                        key={count}
+                        onClick={() => onLoopCountChange(count as LoopCount)}
+                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all flex items-center justify-between ${
+                          loopCount === count
+                            ? 'bg-purple-50 text-purple-700 font-medium border-2 border-purple-200'
+                            : 'bg-white text-gray-700 hover:bg-purple-50 border-2 border-gray-200'
+                        }`}
+                      >
+                        <span>{count === -1 ? '无限循环' : `${count} 次`}</span>
+                        {loopCount === count && <span className="text-purple-600 text-lg">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 my-4"></div>
+
+                {/* 自动下一句开关*/}
+                <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
+                  <button
+                    onClick={() => onAutoNextSentenceChange(!autoNextSentence)}
+                    className="w-full flex items-center justify-between"
+                  >
+                    <span className="text-sm font-medium text-gray-700">自动下一句</span>
+                    <div className={`w-12 h-6 rounded-full transition-colors ${autoNextSentence ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                      <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform mt-0.5 ${autoNextSentence ? 'ml-6' : 'ml-0.5'}`}></div>
+                    </div>
+                  </button>
+                </div>
+
+                {/* 当前循环次数显示 */}
+                <div className="bg-purple-50 rounded-xl p-4 text-center">
+                  <div className="text-xs text-gray-500 mb-1">当前循环进度</div>
+                  <div className="text-lg font-bold text-purple-600">
+                    {loopCount === -1
+                      ? `第${currentLoopIndex + 1} 次`
+                      : `第${currentLoopIndex + 1} / ${loopCount} 次`
+                    }
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 练习 Tab */}
+      {activeTab === 'practice' && (
+        <div className="hidden lg:block">
+          <div className="p-6 space-y-4 h-[600px] overflow-y-auto">
+            <div className="text-xs font-semibold text-gray-500 uppercase mb-3">英语练习</div>
+
+            <button
+              onClick={() => onPracticeModeChange(!isPracticeMode)}
+              className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all flex items-center justify-between ${
+                isPracticeMode
+                  ? 'bg-purple-50 text-purple-700 font-medium border-2 border-purple-200'
+                  : 'bg-white text-gray-700 hover:bg-purple-50 border-2 border-gray-200'
+              }`}
+            >
+              <div>
+                <div className="font-medium">跟读练习</div>
+                <div className="text-xs text-gray-500 mt-1">录制你的发音并与原音对比</div>
+              </div>
+              {isPracticeMode && <span className="text-purple-600 text-lg">✓</span>}
+            </button>
+
+            <button
+              onClick={() => onClozeModeChange(!isClozeMode)}
+              className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all flex items-center justify-between ${
+                isClozeMode
+                  ? 'bg-purple-50 text-purple-700 font-medium border-2 border-purple-200'
+                  : 'bg-white text-gray-700 hover:bg-purple-50 border-2 border-gray-200'
+              }`}
+            >
+              <div>
+                <div className="font-medium">填空练习</div>
+                <div className="text-xs text-gray-500 mt-1">点击遮挡的单词来揭晓答案</div>
+              </div>
+              {isClozeMode && <span className="text-purple-600 text-lg">✓</span>}
+            </button>
+
+            {(isPracticeMode || isClozeMode) && (
+              <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-200">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div className="text-sm text-blue-800">
+                    <div className="font-semibold mb-1">提示</div>
+                    <div>
+                      {isPracticeMode && '切换到"字幕"标签页开始跟读练习'}
+                      {isClozeMode && !isPracticeMode && '切换到"字幕"标签页查看填空练习'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 移动端：字幕列表（保持原样） */}
+      <div className="lg:hidden">
+        {/* 字幕列表 */}
+        <div
+          ref={subtitleListRef}
+          className={`p-3 space-y-2 ${
+          themeMode === 'dark' ? 'bg-gray-900' : ''
+        }`}
+        >
+          {subtitles.map((subtitle) => {
+            const isActive = subtitle.id === activeSubtitleId;
+
+            return (
+              <div
+                key={subtitle.id}
+                data-subtitle-id={subtitle.id}
+                className={`
+                  p-3 rounded-xl border-2 transition-all duration-300 cursor-pointer
+                  ${
+                    isActive
                       ? themeMode === 'dark'
+                        ? 'bg-yellow-900/30 border-yellow-600 shadow-md'
+                        : 'bg-yellow-50 border-yellow-400 shadow-md'
+                      : themeMode === 'dark'
+                      ? 'bg-gray-800 border-gray-700 hover:border-purple-500 hover:shadow-sm'
+                      : 'bg-white border-gray-200 hover:border-purple-300 hover:shadow-sm'
+                  }
+                `}
+                onClick={() => handleSubtitleClick(subtitle.id, subtitle.startTime)}
+              >
+                {/* 时间戳*/}
+                <div className="flex items-center gap-2 mb-2">
+                  <span
+                    className={`
+                      text-xs font-bold px-2 py-0.5 rounded-full
+                      ${isActive
+                        ? themeMode === 'dark'
+                          ? 'bg-yellow-900 text-yellow-300'
+                          : 'bg-yellow-200 text-yellow-800'
+                        : themeMode === 'dark'
+                        ? 'bg-gray-700 text-gray-300'
+                        : 'bg-gray-100 text-gray-600'
+                      }
+                    `}
+                  >
+                    {formatTime(subtitle.startTime)}
+                  </span>
+                  {isActive && (
+                    <span className={`flex items-center gap-1 text-xs font-semibold ${
+                      themeMode === 'dark' ? 'text-yellow-400' : 'text-yellow-700'
+                    }`}>
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                      </svg>
+                      播放中
+                    </span>
+                  )}
+                </div>
+
+                {/* 英文字幕 */}
+                {(subtitleMode === 'bilingual' || subtitleMode === 'english') && (
+                  <p
+                    className={`
+                      leading-relaxed
+                      font-semibold
+                      ${subtitleMode === 'bilingual' ? 'mb-2' : ''}
+                      ${isActive
+                        ? themeMode === 'dark'
+                          ? 'text-white'
+                          : 'text-gray-900'
+                        : themeMode === 'dark'
                         ? 'text-gray-300'
                         : 'text-gray-700'
-                      : themeMode === 'dark'
-                      ? 'text-gray-400'
-                      : 'text-gray-600'
-                    }
-                  `}
-                  style={{ fontSize: `${subtitleMode === 'bilingual' ? fontSize : fontSize - 2}px` }}
-                >
-                  {subtitle.translation}
-                </p>
-              )}
+                      }
+                    `}
+                    style={{ fontSize: `${fontSize}px` }}
+                  >
+                    {renderAnnotatedEnglish(subtitle.id, subtitle.text, subtitle.annotations)}
+                  </p>
+                )}
 
-              {/* 口语练习录音控件 */}
-              {isPracticeMode && (
-                <div className={`mt-2 lg:mt-3 pt-2 lg:pt-3 ${
-                  themeMode === 'dark' ? 'border-gray-700' : 'border-gray-200'
-                } border-t`}>
-                  <AudioRecorder
-                    videoId={videoId}
-                    subtitleId={subtitle.id}
-                    existingAudioUrl={existingRecordings[subtitle.id]}
-                    onRecordingComplete={(audioUrl) => handleRecordingComplete(subtitle.id, audioUrl)}
-                    subtitleStartTime={subtitle.startTime}
-                    subtitleEndTime={subtitle.endTime}
-                    onPlayOriginal={onPlayOriginal ? () => onPlayOriginal(subtitle.id) : undefined}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })}
+                {/* 中文翻译 */}
+                {(subtitleMode === 'bilingual' || subtitleMode === 'chinese') && (
+                  <p
+                    className={`
+                      leading-relaxed
+                      ${subtitleMode === 'chinese' ? 'font-semibold' : ''}
+                      ${isActive
+                        ? themeMode === 'dark'
+                          ? 'text-gray-300'
+                          : 'text-gray-700'
+                        : themeMode === 'dark'
+                        ? 'text-gray-400'
+                        : 'text-gray-600'
+                      }
+                    `}
+                    style={{ fontSize: `${subtitleMode === 'bilingual' ? fontSize : fontSize - 2}px` }}
+                  >
+                    {subtitle.translation}
+                  </p>
+                )}
+
+                {/* 口语练习录音控件 */}
+                {isPracticeMode && (
+                  <div className={`mt-2 pt-2 ${
+                    themeMode === 'dark' ? 'border-gray-700' : 'border-gray-200'
+                  } border-t`}>
+                    <AudioRecorder
+                      videoId={videoId}
+                      subtitleId={subtitle.id}
+                      existingAudioUrl={existingRecordings[subtitle.id]}
+                      onRecordingComplete={(audioUrl) => handleRecordingComplete(subtitle.id, audioUrl)}
+                      subtitleStartTime={subtitle.startTime}
+                      subtitleEndTime={subtitle.endTime}
+                      onPlayOriginal={onPlayOriginal ? () => onPlayOriginal(subtitle.id) : undefined}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
 
@@ -850,3 +1067,5 @@ export default function SubtitlePanel({
     </React.Fragment>
   );
 }
+
+

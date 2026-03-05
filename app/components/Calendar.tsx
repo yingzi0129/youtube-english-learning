@@ -85,7 +85,7 @@ export default function Calendar() {
   };
 
   // 获取当月第一天是星期几
-  const firstDay = new Date(year, month, 1).getDay();
+  const firstDay = (new Date(year, month, 1).getDay() + 6) % 7;
 
   // 获取当月天数
   const daysInMonth = new Date(year, month + 1, 0).getDate();

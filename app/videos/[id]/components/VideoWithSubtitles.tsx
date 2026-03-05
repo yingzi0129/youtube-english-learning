@@ -452,6 +452,8 @@ export default function VideoWithSubtitles({ videoUrl, subtitles }: VideoWithSub
         onThemeModeChange={setThemeMode}
         isPracticeMode={isPracticeMode}
         onPracticeModeChange={setIsPracticeMode}
+        isClozeMode={isClozeMode}
+        onClozeModeChange={setIsClozeMode}
       />
     </>
   );

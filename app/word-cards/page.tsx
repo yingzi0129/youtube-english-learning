@@ -73,6 +73,7 @@ export default function WordCardsPage() {
   const [meaningHidden, setMeaningHidden] = useState<Record<string, boolean>>({});
   const [typeFilter, setTypeFilter] = useState<LearningPointType>('word');
   const [statusFilter, setStatusFilter] = useState<'all' | VocabStatus>('all');
+  const [videoSearch, setVideoSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingCards, setLoadingCards] = useState(false);
   const [error, setError] = useState<string>('');
@@ -249,6 +250,27 @@ export default function WordCardsPage() {
     return counts;
   }, [cards, typeFilter, statusMap]);
 
+  const filteredVideos = useMemo(() => {
+    const keyword = videoSearch.trim().toLowerCase();
+    if (!keyword) return videos;
+    return videos.filter((video) => video.title?.toLowerCase().includes(keyword));
+  }, [videos, videoSearch]);
+
+  const statusStyles: Record<VocabStatus, { active: string; inactive: string }> = {
+    mastered: {
+      active: 'bg-emerald-500 text-white',
+      inactive: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+    },
+    familiar: {
+      active: 'bg-amber-500 text-white',
+      inactive: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
+    },
+    unknown: {
+      active: 'bg-slate-500 text-white',
+      inactive: 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+    },
+  };
+
   const updateStatus = async (vocabId: string, status: VocabStatus) => {
     if (!userId) return;
     const prevStatus = statusMap[vocabId] || 'unknown';
@@ -298,6 +320,14 @@ export default function WordCardsPage() {
           <aside className="lg:col-span-3">
             <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-purple-100/50 shadow-sm p-4">
               <div className="text-sm font-semibold text-gray-700 mb-3">视频库</div>
+              <div className="mb-3">
+                <input
+                  value={videoSearch}
+                  onChange={(event) => setVideoSearch(event.target.value)}
+                  placeholder="搜索视频"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
+                />
+              </div>
               {loading ? (
                 <div className="space-y-2 animate-pulse">
                   {[1, 2, 3, 4, 5].map((i) => (
@@ -306,9 +336,11 @@ export default function WordCardsPage() {
                 </div>
               ) : videos.length === 0 ? (
                 <div className="text-sm text-gray-500">暂无视频</div>
+              ) : filteredVideos.length === 0 ? (
+                <div className="text-sm text-gray-500">未找到匹配的视频</div>
               ) : (
                 <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
-                  {videos.map((video) => (
+                  {filteredVideos.map((video) => (
                     <button
                       key={video.id}
                       onClick={() => setSelectedVideoId(video.id)}
@@ -358,9 +390,13 @@ export default function WordCardsPage() {
                       key={tab.key}
                       onClick={() => setStatusFilter(tab.key)}
                       className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-                        statusFilter === tab.key
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        tab.key === 'all'
+                          ? statusFilter === 'all'
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          : statusFilter === tab.key
+                            ? statusStyles[tab.key].active
+                            : statusStyles[tab.key].inactive
                       }`}
                     >
                       {tab.label} {`(${statusCounts[tab.key] || 0})`}
@@ -429,9 +465,7 @@ export default function WordCardsPage() {
                                 key={s}
                                 onClick={() => card.vocabId && updateStatus(card.vocabId, s)}
                                 className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-                                  status === s
-                                    ? 'bg-purple-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  status === s ? statusStyles[s].active : statusStyles[s].inactive
                                 }`}
                                 disabled={!card.vocabId}
                               >

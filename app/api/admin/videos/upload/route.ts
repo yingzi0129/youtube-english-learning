@@ -10,6 +10,7 @@ export const runtime = 'nodejs';
 type StorageProvider = 'r2' | 'cos';
 
 const MAX_RETRIES = Math.max(0, Number(process.env.VIDEO_SYNC_MAX_RETRIES ?? '2') || 0);
+const CACHE_CONTROL = 'public, max-age=31536000';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -56,8 +57,16 @@ const uploadWithRetry = async (fn: () => Promise<string>, retries: number) => {
   }
 };
 
-const uploadToStorage = (provider: StorageProvider, key: string, buffer: Buffer, contentType: string) => {
-  return provider === 'r2' ? uploadToR2(key, buffer, contentType) : uploadToCos(key, buffer, contentType);
+const uploadToStorage = (
+  provider: StorageProvider,
+  key: string,
+  buffer: Buffer,
+  contentType: string,
+  cacheControl?: string
+) => {
+  return provider === 'r2'
+    ? uploadToR2(key, buffer, contentType, { cacheControl })
+    : uploadToCos(key, buffer, contentType, { cacheControl });
 };
 
 export async function POST(request: NextRequest) {
@@ -101,9 +110,21 @@ export async function POST(request: NextRequest) {
     const thumbnailContentType = thumbnailFile?.type || 'image/jpeg';
     const thumbnailKey = thumbnailFile ? buildKey('thumbnails', getFileExtension(thumbnailFile)) : null;
 
-    const primaryVideoUrl = await uploadToStorage(primaryStorage, videoKey, videoBuffer, videoContentType);
+    const primaryVideoUrl = await uploadToStorage(
+      primaryStorage,
+      videoKey,
+      videoBuffer,
+      videoContentType,
+      CACHE_CONTROL
+    );
     const primaryThumbnailUrl = thumbnailBuffer && thumbnailKey
-      ? await uploadToStorage(primaryStorage, thumbnailKey, thumbnailBuffer, thumbnailContentType)
+      ? await uploadToStorage(
+          primaryStorage,
+          thumbnailKey,
+          thumbnailBuffer,
+          thumbnailContentType,
+          CACHE_CONTROL
+        )
       : null;
 
     const adminClient = createAdminClient();
@@ -149,7 +170,7 @@ export async function POST(request: NextRequest) {
         };
 
         const secondaryVideoUrl = await uploadWithRetry(
-          () => uploadToStorage(secondaryStorage, videoKey, videoBuffer, videoContentType),
+          () => uploadToStorage(secondaryStorage, videoKey, videoBuffer, videoContentType, CACHE_CONTROL),
           MAX_RETRIES
         );
 
@@ -161,7 +182,14 @@ export async function POST(request: NextRequest) {
 
         if (thumbnailBuffer && thumbnailKey) {
           const secondaryThumbnailUrl = await uploadWithRetry(
-            () => uploadToStorage(secondaryStorage, thumbnailKey, thumbnailBuffer, thumbnailContentType),
+            () =>
+              uploadToStorage(
+                secondaryStorage,
+                thumbnailKey,
+                thumbnailBuffer,
+                thumbnailContentType,
+                CACHE_CONTROL
+              ),
             MAX_RETRIES
           );
           if (secondaryStorage === 'r2') {

@@ -20,7 +20,8 @@ const cosClient = new S3Client({
 export async function uploadToCos(
   key: string,
   buffer: Buffer,
-  contentType: string
+  contentType: string,
+  options?: { cacheControl?: string }
 ): Promise<string> {
   if (!COS_BUCKET || !COS_DOMAIN) {
     throw new Error('COS 配置缺失：请检查 COS_BUCKET / NEXT_PUBLIC_COS_DOMAIN');
@@ -31,6 +32,7 @@ export async function uploadToCos(
     Key: key,
     Body: buffer,
     ContentType: contentType,
+    CacheControl: options?.cacheControl,
   });
 
   await cosClient.send(command);

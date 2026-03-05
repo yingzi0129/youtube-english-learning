@@ -17,9 +17,9 @@ const r2Client = new S3Client({
 
 /**
  * 生成带日期的音频文件路径
- * @param userId 用户ID
- * @param videoId 视频ID
- * @param subtitleId 字幕ID
+ * @param userId 用户 ID
+ * @param videoId 视频 ID
+ * @param subtitleId 字幕 ID
  * @returns 格式：audio/2026/02/18/userId/videoId/subtitleId.webm
  */
 export function generateAudioPath(
@@ -45,13 +45,15 @@ export function generateAudioPath(
 export async function uploadToR2(
   key: string,
   buffer: Buffer,
-  contentType: string
+  contentType: string,
+  options?: { cacheControl?: string }
 ): Promise<string> {
   const command = new PutObjectCommand({
     Bucket: R2_BUCKET,
     Key: key,
     Body: buffer,
     ContentType: contentType,
+    CacheControl: options?.cacheControl,
   });
 
   await r2Client.send(command);

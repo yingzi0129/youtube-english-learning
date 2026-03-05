@@ -7,6 +7,7 @@ export const runtime = 'nodejs';
 
 const FETCH_TIMEOUT_MS = Number(process.env.COS_BACKFILL_FETCH_TIMEOUT_MS ?? '15000');
 const UPLOAD_TIMEOUT_MS = Number(process.env.COS_BACKFILL_UPLOAD_TIMEOUT_MS ?? '20000');
+const CACHE_CONTROL = 'public, max-age=31536000';
 
 const getKeyFromUrl = (url: string) => {
   try {
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
           const { buffer, contentType } = await fetchToBuffer(sourceVideoUrl);
           console.log('[backfill-cos] 上传视频到 COS', { id: video.id, key });
           const cosUrl = await withTimeout(
-            uploadToCos(key, buffer, contentType),
+            uploadToCos(key, buffer, contentType, { cacheControl: CACHE_CONTROL }),
             UPLOAD_TIMEOUT_MS,
             '上传超时'
           );
@@ -135,7 +136,7 @@ export async function POST(request: NextRequest) {
           const { buffer, contentType } = await fetchToBuffer(sourceThumbUrl);
           console.log('[backfill-cos] 上传缩略图到 COS', { id: video.id, key });
           const cosUrl = await withTimeout(
-            uploadToCos(key, buffer, contentType),
+            uploadToCos(key, buffer, contentType, { cacheControl: CACHE_CONTROL }),
             UPLOAD_TIMEOUT_MS,
             '上传超时'
           );
