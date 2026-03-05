@@ -11,6 +11,17 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     const isTrial = isTrialUser(user);
 
+    // 检查是否是管理员
+    let isAdmin = false;
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      isAdmin = profile?.role === 'admin';
+    }
+
     // 从数据库获取所有未删除的视频，按发布时间倒序
     let query = supabase
       .from('videos')
@@ -74,7 +85,14 @@ export async function GET(request: NextRequest) {
       success: true,
       videos: formattedVideos,
     });
-    response.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30');
+
+    // 管理员：短缓存（10秒），方便看到最新上传的视频
+    // 普通用户：长缓存（10分钟），减少服务器压力
+    if (isAdmin) {
+      response.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30');
+    } else {
+      response.headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=1800');
+    }
     response.headers.set('Vary', 'Cookie');
     return response;
   } catch (error) {

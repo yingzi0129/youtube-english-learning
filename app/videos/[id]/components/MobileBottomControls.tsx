@@ -76,16 +76,16 @@ export default function MobileBottomControls({
       {/* 遮罩层 */}
       {activePanel && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-[60] lg:hidden"
           onClick={handleClosePanel}
         />
       )}
 
       {/* 弹出面板 */}
       {activePanel && (
-        <div className="fixed bottom-20 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-50 lg:hidden max-h-[70vh] overflow-y-auto">
+        <div className="fixed bottom-20 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-[70] lg:hidden max-h-[calc(100vh-280px)] overflow-hidden flex flex-col">
           {/* 面板头部 */}
-          <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
             <h3 className="text-lg font-bold text-gray-900">
               {activePanel === 'subtitle' && '字幕设置'}
               {activePanel === 'loop' && '循环设置'}
@@ -102,8 +102,8 @@ export default function MobileBottomControls({
             </button>
           </div>
 
-          {/* 面板内容 */}
-          <div className="p-6">
+          {/* 面板内容 - 可滚动区域 */}
+          <div className="flex-1 overflow-y-auto p-6">
             {/* 字幕设置面板 */}
             {activePanel === 'subtitle' && (
               <div className="space-y-6">
