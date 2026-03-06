@@ -3,10 +3,12 @@
 import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import AudioRecorder from '@/app/components/AudioRecorder';
+import FavoriteButton from '@/app/components/FavoriteButton';
 import { createClient } from '@/lib/supabase/client';
 
 interface Subtitle {
   id: number;
+  dbId?: string; // 数据库 UUID，用于收藏功能
   startTime: number;
   endTime: number;
   text: string;
@@ -629,23 +631,35 @@ export default function SubtitlePanel({
                   `}
                   onClick={() => handleSubtitleClick(subtitle.id, subtitle.startTime)}
                 >
-                  {/* 时间戳*/}
-                  <div className="flex items-center gap-2 mb-2">
-                    <span
-                      className={`
-                        text-xs font-bold px-2 py-1 rounded-full
-                        ${isActive ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-100 text-gray-600'}
-                      `}
-                    >
-                      {formatTime(subtitle.startTime)}
-                    </span>
-                    {isActive && (
-                      <span className="flex items-center gap-1 text-xs font-semibold text-yellow-700">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                        </svg>
-                        播放中
+                  {/* 时间戳和收藏按钮 */}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`
+                          text-xs font-bold px-2 py-1 rounded-full
+                          ${isActive ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-100 text-gray-600'}
+                        `}
+                      >
+                        {formatTime(subtitle.startTime)}
                       </span>
+                      {isActive && (
+                        <span className="flex items-center gap-1 text-xs font-semibold text-yellow-700">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                          </svg>
+                          播放中
+                        </span>
+                      )}
+                    </div>
+                    {subtitle.dbId && (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <FavoriteButton
+                          type="subtitle_segment"
+                          videoId={videoId}
+                          itemId={subtitle.dbId}
+                          size="sm"
+                        />
+                      </div>
                     )}
                   </div>
 
@@ -903,32 +917,44 @@ export default function SubtitlePanel({
                 `}
                 onClick={() => handleSubtitleClick(subtitle.id, subtitle.startTime)}
               >
-                {/* 时间戳*/}
-                <div className="flex items-center gap-2 mb-2">
-                  <span
-                    className={`
-                      text-xs font-bold px-2 py-0.5 rounded-full
-                      ${isActive
-                        ? themeMode === 'dark'
-                          ? 'bg-yellow-900 text-yellow-300'
-                          : 'bg-yellow-200 text-yellow-800'
-                        : themeMode === 'dark'
-                        ? 'bg-gray-700 text-gray-300'
-                        : 'bg-gray-100 text-gray-600'
-                      }
-                    `}
-                  >
-                    {formatTime(subtitle.startTime)}
-                  </span>
-                  {isActive && (
-                    <span className={`flex items-center gap-1 text-xs font-semibold ${
-                      themeMode === 'dark' ? 'text-yellow-400' : 'text-yellow-700'
-                    }`}>
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                      </svg>
-                      播放中
+                {/* 时间戳和收藏按钮 */}
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`
+                        text-xs font-bold px-2 py-0.5 rounded-full
+                        ${isActive
+                          ? themeMode === 'dark'
+                            ? 'bg-yellow-900 text-yellow-300'
+                            : 'bg-yellow-200 text-yellow-800'
+                          : themeMode === 'dark'
+                          ? 'bg-gray-700 text-gray-300'
+                          : 'bg-gray-100 text-gray-600'
+                        }
+                      `}
+                    >
+                      {formatTime(subtitle.startTime)}
                     </span>
+                    {isActive && (
+                      <span className={`flex items-center gap-1 text-xs font-semibold ${
+                        themeMode === 'dark' ? 'text-yellow-400' : 'text-yellow-700'
+                      }`}>
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                        </svg>
+                        播放中
+                      </span>
+                    )}
+                  </div>
+                  {subtitle.dbId && (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <FavoriteButton
+                        type="subtitle_segment"
+                        videoId={videoId}
+                        itemId={subtitle.dbId}
+                        size="sm"
+                      />
+                    </div>
                   )}
                 </div>
 

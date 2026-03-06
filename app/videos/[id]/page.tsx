@@ -81,6 +81,7 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
   // 格式化字幕数据
   const subtitles = (subtitlesData || []).map(sub => ({
     id: sub.sequence,
+    dbId: sub.id, // 数据库 UUID，用于收藏功能
     startTime: sub.start_time,
     endTime: sub.end_time,
     text: sub.text_en || '',
@@ -137,7 +138,7 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
 
         {/* 视频介绍：仅桌面端显示（移动端不展示此卡片） */}
         <div className="hidden lg:block mt-6">
-          <VideoInfo video={video} />
+          <VideoInfo video={{ ...video, id: videoData.id }} />
         </div>
       </div>
     </div>

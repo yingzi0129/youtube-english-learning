@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import HomeClient from './HomeClient';
+import { useFavoritesStore } from '@/lib/stores/favorites-store';
 
 type VideoItem = {
   id: string;
@@ -31,6 +32,7 @@ export default function HomePageClient() {
   const [error, setError] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [userLabel, setUserLabel] = useState<string | undefined>(undefined);
+  const { fetchFavorites } = useFavoritesStore();
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +76,8 @@ export default function HomePageClient() {
 
         if (!cancelled) {
           setVideos(videosData?.videos || []);
+          // 加载收藏数据
+          fetchFavorites();
         }
       } catch (err: any) {
         if (!cancelled) {
@@ -91,7 +95,7 @@ export default function HomePageClient() {
       cancelled = true;
       videosController.abort();
     };
-  }, [router]);
+  }, [router, fetchFavorites]);
 
   return (
     <HomeClient

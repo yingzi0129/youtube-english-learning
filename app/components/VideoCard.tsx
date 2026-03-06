@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import FavoriteButton from './FavoriteButton';
+import { useFavoritesStore } from '@/lib/stores/favorites-store';
 
 interface VideoCardProps {
   id: string;
@@ -28,6 +30,11 @@ export default function VideoCard({
 }: VideoCardProps) {
   const router = useRouter();
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const { checkFavoriteStatus } = useFavoritesStore();
+
+  // 检查是否已收藏
+  const isFavorited = checkFavoriteStatus('video', id);
 
   const handleClick = () => {
     router.push(`/videos/${id}`);
@@ -66,10 +73,34 @@ export default function VideoCard({
   return (
     <div
       onClick={handleClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className="group bg-white rounded-2xl lg:rounded-3xl shadow-md border border-purple-100/50 overflow-hidden hover:shadow-2xl hover:border-purple-200 transition-all duration-500 hover:-translate-y-2 cursor-pointer"
     >
       {/* 视频缩略图 */}
       <div className="relative aspect-video bg-gradient-to-br from-purple-400 via-pink-400 to-rose-400 flex items-center justify-center overflow-hidden">
+        {/* 收藏按钮 - 右上角，悬停或已收藏时显示 */}
+        <div
+          className={`absolute top-2 right-2 lg:top-3 lg:right-3 z-20 transition-all duration-300 ${
+            isHovered || isFavorited
+              ? 'opacity-100 scale-100'
+              : 'opacity-0 scale-75 pointer-events-none'
+          }`}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-10 h-10 lg:w-12 lg:h-12 bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center hover:scale-110"
+          >
+            <FavoriteButton
+              type="video"
+              videoId={id}
+              itemId={id}
+              size="md"
+              className="!w-auto !h-auto"
+            />
+          </div>
+        </div>
+
         {/* 加载动画 */}
         {!imageLoaded && thumbnail && (
           <div className="absolute inset-0 flex items-center justify-center">

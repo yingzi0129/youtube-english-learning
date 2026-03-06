@@ -1,9 +1,11 @@
 'use client';
 
 import React from 'react';
+import FavoriteButton from '@/app/components/FavoriteButton';
 
 interface VideoInfoProps {
   video: {
+    id: string;
     title: string;
     creator: string;
     difficulty: string;
@@ -17,10 +19,19 @@ interface VideoInfoProps {
 export default function VideoInfo({ video }: VideoInfoProps) {
   return (
     <div className="bg-white/90 backdrop-blur-md rounded-3xl shadow-lg p-6 border border-purple-100/50">
-      {/* 标题 */}
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">
-        {video.title}
-      </h1>
+      {/* 标题和收藏按钮 */}
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <h1 className="text-2xl font-bold text-gray-900 flex-1">
+          {video.title}
+        </h1>
+        <FavoriteButton
+          type="video"
+          videoId={video.id}
+          itemId={video.id}
+          size="lg"
+          showText
+        />
+      </div>
 
       {/* 元信息 */}
       <div className="flex flex-wrap items-center gap-4 mb-4 pb-4 border-b border-gray-200">

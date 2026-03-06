@@ -11,6 +11,7 @@ interface VideoWithSubtitlesProps {
   videoUrl: string;
   subtitles: Array<{
     id: number;
+    dbId?: string; // 数据库 UUID，用于收藏功能
     startTime: number;
     endTime: number;
     text: string;
