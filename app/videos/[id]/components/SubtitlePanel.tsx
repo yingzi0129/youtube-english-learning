@@ -36,6 +36,11 @@ type LearningPoint = {
 
 interface SubtitlePanelProps {
   subtitles: Subtitle[];
+  isLoadingSubtitles?: boolean;
+  hasMoreAfter?: boolean;
+  hasMoreBefore?: boolean;
+  onLoadAfter?: () => void;
+  onLoadBefore?: () => void;
   currentTime?: number;
   // New: seek by subtitle id (supports smart backtracking in parent).
   onSeekToSubtitle?: (subtitleId: number) => void;
@@ -63,6 +68,11 @@ interface SubtitlePanelProps {
 
 export default function SubtitlePanel({
   subtitles,
+  isLoadingSubtitles = false,
+  hasMoreAfter = false,
+  hasMoreBefore = false,
+  onLoadAfter,
+  onLoadBefore,
   currentTime = 0,
   onSeekToSubtitle,
   onSeek,
@@ -87,6 +97,8 @@ export default function SubtitlePanel({
   onClozeModeChange,
 }: SubtitlePanelProps) {
   const subtitleListRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
+  const bottomSentinelRef = useRef<HTMLDivElement>(null);
   const [pinnedSubtitleId, setPinnedSubtitleId] = useState<number | null>(null);
 
   // Cloze (fill-in) mode: mask all annotated learning points until revealed by click.
@@ -432,6 +444,42 @@ export default function SubtitlePanel({
     }
   }, [activeSubtitleId]);
 
+  useEffect(() => {
+    if (!onLoadAfter && !onLoadBefore) return;
+    const container = subtitleListRef.current;
+    const top = topSentinelRef.current;
+    const bottom = bottomSentinelRef.current;
+    if (!top && !bottom) return;
+
+    const root = (() => {
+      if (!container) return null;
+      const overflowY = window.getComputedStyle(container).overflowY;
+      if (overflowY === 'auto' || overflowY === 'scroll') return container;
+      return null;
+    })();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (isLoadingSubtitles) return;
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          if (entry.target === bottom && hasMoreAfter && onLoadAfter) {
+            onLoadAfter();
+          }
+          if (entry.target === top && hasMoreBefore && onLoadBefore) {
+            onLoadBefore();
+          }
+        });
+      },
+      { root, rootMargin: '200px 0px', threshold: 0.01 }
+    );
+
+    if (top) observer.observe(top);
+    if (bottom) observer.observe(bottom);
+
+    return () => observer.disconnect();
+  }, [onLoadAfter, onLoadBefore, hasMoreAfter, hasMoreBefore, isLoadingSubtitles]);
+
   // 控制下拉菜单显示
   const [showLoopMenu, setShowLoopMenu] = useState(false);
   const [showPracticeMenu, setShowPracticeMenu] = useState(false);
@@ -614,6 +662,15 @@ export default function SubtitlePanel({
             ref={subtitleListRef}
             className="p-4 space-y-3 h-[600px] overflow-y-auto"
           >
+            <div ref={topSentinelRef} />
+            {hasMoreBefore && subtitles.length > 0 && (
+              <div className="text-center text-xs text-gray-400">向上滚动加载更早字幕</div>
+            )}
+            {subtitles.length === 0 && (
+              <div className="py-10 text-center text-sm text-gray-500">
+                {isLoadingSubtitles ? '字幕加载中...' : '暂无字幕'}
+              </div>
+            )}
             {subtitles.map((subtitle) => {
               const isActive = subtitle.id === activeSubtitleId;
 
@@ -708,6 +765,12 @@ export default function SubtitlePanel({
                 </div>
               );
             })}
+            <div ref={bottomSentinelRef} />
+            {subtitles.length > 0 && (isLoadingSubtitles || hasMoreAfter) && (
+              <div className="py-2 text-center text-xs text-gray-500">
+                {isLoadingSubtitles ? '正在加载更多字幕...' : '继续向下滚动加载更多'}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -896,6 +959,17 @@ export default function SubtitlePanel({
           themeMode === 'dark' ? 'bg-gray-900' : ''
         }`}
         >
+          <div ref={topSentinelRef} />
+          {hasMoreBefore && subtitles.length > 0 && (
+            <div className={`text-center text-xs ${themeMode === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              向上滚动加载更早字幕
+            </div>
+          )}
+          {subtitles.length === 0 && (
+            <div className={`py-10 text-center text-sm ${themeMode === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              {isLoadingSubtitles ? '字幕加载中...' : '暂无字幕'}
+            </div>
+          )}
           {subtitles.map((subtitle) => {
             const isActive = subtitle.id === activeSubtitleId;
 
@@ -1020,6 +1094,12 @@ export default function SubtitlePanel({
               </div>
             );
           })}
+          <div ref={bottomSentinelRef} />
+          {subtitles.length > 0 && (isLoadingSubtitles || hasMoreAfter) && (
+            <div className={`py-2 text-center text-xs ${themeMode === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+              {isLoadingSubtitles ? '正在加载更多字幕...' : '继续向下滚动加载更多'}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1032,9 +1112,20 @@ export default function SubtitlePanel({
             style={{ top: cardPos.top, left: cardPos.left }}
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-2xl font-bold text-gray-900 break-words">
-                  {cardPoint.text}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-2xl font-bold text-gray-900 break-words">
+                    {cardPoint.text}
+                  </div>
+                  {/* 收藏按钮 */}
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <FavoriteButton
+                      type="vocabulary"
+                      videoId={videoId}
+                      itemId={cardPoint.id}
+                      size="md"
+                    />
+                  </div>
                 </div>
                 {(cardPoint.phonetic || showPronunciationButton) && (
                   <div className="mt-2 flex items-center gap-2">
@@ -1093,5 +1184,3 @@ export default function SubtitlePanel({
     </React.Fragment>
   );
 }
-
-

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAdminToast } from '../../components/AdminToastProvider';
@@ -19,12 +19,23 @@ export default function UploadSubtitlesPage() {
   const videoId = searchParams.get('video_id');
 
   const [loading, setLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState('');
   const [videoTitle, setVideoTitle] = useState('');
   const [fileContent, setFileContent] = useState('');
   const [fileType, setFileType] = useState<'json' | 'text'>('text');
   const [previewData, setPreviewData] = useState<SubtitleItem[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const [selectedFileName, setSelectedFileName] = useState('');
+  const [aiModel, setAiModel] = useState('gpt-5.2');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useAdminToast();
+
+  const AI_MODELS = [
+    { value: 'gpt-5.2', label: 'GPT-5.2' },
+    { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+  ];
 
   useEffect(() => {
     if (videoId) {
@@ -45,7 +56,6 @@ export default function UploadSubtitlesPage() {
     }
   };
 
-  // 解析时间戳（m:ss 或 mm:ss）转换为秒
   const parseTimeToSeconds = (timeStr: string): number => {
     const parts = timeStr.split(':');
     if (parts.length === 2) {
@@ -54,6 +64,13 @@ export default function UploadSubtitlesPage() {
       return minutes * 60 + seconds;
     }
     return 0;
+  };
+
+  const formatSeconds = (s: number): string => {
+    const total = Math.round(s);
+    const m = Math.floor(total / 60);
+    const sec = total % 60;
+    return `${m}:${sec.toString().padStart(2, '0')}`;
   };
 
   const DEFAULT_SUBTITLE_DURATION = 5;
@@ -113,7 +130,6 @@ export default function UploadSubtitlesPage() {
     return normalized;
   };
 
-  // 解析自定义文本格式
   const parseTextFormat = (content: string): SubtitleItem[] => {
     const lines = content.trim().split('\n');
     const subtitles: SubtitleItem[] = [];
@@ -122,18 +138,13 @@ export default function UploadSubtitlesPage() {
     for (const line of lines) {
       const trimmedLine = line.trim();
       if (trimmedLine === '') {
-        // 空行，处理当前块
         if (currentBlock.length >= 3) {
-          const timeStr = currentBlock[0];
-          const textEn = currentBlock[1];
-          const textZh = currentBlock[2];
-
           subtitles.push({
             sequence: subtitles.length + 1,
-            start_time: parseTimeToSeconds(timeStr),
-            end_time: 0, // 稍后计算
-            text_en: textEn,
-            text_zh: textZh
+            start_time: parseTimeToSeconds(currentBlock[0]),
+            end_time: 0,
+            text_en: currentBlock[1],
+            text_zh: currentBlock[2],
           });
         }
         currentBlock = [];
@@ -142,27 +153,20 @@ export default function UploadSubtitlesPage() {
       }
     }
 
-    // 处理最后一个块
     if (currentBlock.length >= 3) {
-      const timeStr = currentBlock[0];
-      const textEn = currentBlock[1];
-      const textZh = currentBlock[2];
-
       subtitles.push({
         sequence: subtitles.length + 1,
-        start_time: parseTimeToSeconds(timeStr),
+        start_time: parseTimeToSeconds(currentBlock[0]),
         end_time: 0,
-        text_en: textEn,
-        text_zh: textZh
+        text_en: currentBlock[1],
+        text_zh: currentBlock[2],
       });
     }
 
-    // 计算结束时间
     for (let i = 0; i < subtitles.length; i++) {
       if (i < subtitles.length - 1) {
         subtitles[i].end_time = subtitles[i + 1].start_time;
       } else {
-        // 最后一条字幕，默认持续5秒
         subtitles[i].end_time = subtitles[i].start_time + 5;
       }
     }
@@ -170,41 +174,90 @@ export default function UploadSubtitlesPage() {
     return normalizeSubtitleTimes(subtitles);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const processFile = (file: File) => {
+    setSelectedFileName(file.name);
+    const fileName = file.name.toLowerCase();
+
+    if (fileName.endsWith('.docx')) {
+      handleWordFile(file);
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
       setFileContent(content);
 
-      // 根据文件扩展名判断类型
-      const fileName = file.name.toLowerCase();
       if (fileName.endsWith('.json')) {
         setFileType('json');
         try {
           const parsed = normalizeSubtitleTimes(JSON.parse(content));
           setPreviewData(parsed);
           setError('');
-        } catch (err) {
+        } catch {
           setError('JSON格式错误，请检查文件内容');
           setPreviewData([]);
         }
       } else {
-        // 默认为文本格式
         setFileType('text');
         try {
           const parsed = parseTextFormat(content);
           setPreviewData(parsed);
           setError('');
-        } catch (err) {
+        } catch {
           setError('文本格式解析失败，请检查文件内容');
           setPreviewData([]);
         }
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleWordFile = async (file: File) => {
+    setAiLoading(true);
+    setError('');
+    setPreviewData([]);
+    setFileContent('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('model', aiModel);
+
+      const resp = await fetch('/api/admin/ai/word-to-subtitle', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        setError(data.error || 'AI 转换失败');
+        return;
+      }
+
+      const normalized = normalizeSubtitleTimes(data.subtitles);
+      setPreviewData(normalized);
+      setFileContent(JSON.stringify(normalized, null, 2));
+      setFileType('json');
+      showToast('success', `AI 成功转换 ${normalized.length} 条字幕`);
+    } catch (err: any) {
+      setError('Word 文件解析失败：' + (err.message || '未知错误'));
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -220,7 +273,6 @@ export default function UploadSubtitlesPage() {
     try {
       const supabase = createClient();
 
-      // 根据文件类型解析数据
       let subtitles: SubtitleItem[];
       if (fileType === 'json') {
         subtitles = JSON.parse(fileContent);
@@ -228,15 +280,12 @@ export default function UploadSubtitlesPage() {
         subtitles = parseTextFormat(fileContent);
       }
 
-      // 验证数据格式
       if (!Array.isArray(subtitles)) {
         throw new Error('字幕数据必须是数组格式');
       }
 
-      // 删除该视频的旧字幕
       await supabase.from('subtitles').delete().eq('video_id', videoId);
 
-      // 插入新字幕
       const normalizedSubtitles = normalizeSubtitleTimes(subtitles);
       const subtitlesToInsert = normalizedSubtitles.map((item: SubtitleItem) => ({
         video_id: videoId,
@@ -255,7 +304,6 @@ export default function UploadSubtitlesPage() {
 
       if (insertError) throw insertError;
 
-      // 成功后跳转
       showToast('success', '字幕上传成功');
       router.push(`/admin/subtitles?video_id=${videoId}`);
       router.refresh();
@@ -281,13 +329,11 @@ export default function UploadSubtitlesPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* 页面标题 */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">上传字幕</h1>
         <p className="mt-2 text-gray-600">为视频「{videoTitle}」上传字幕文件</p>
       </div>
 
-      {/* 错误提示 */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <p className="text-red-800">{error}</p>
@@ -297,9 +343,7 @@ export default function UploadSubtitlesPage() {
       {/* 格式说明 */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h3 className="text-sm font-semibold text-blue-900 mb-2">支持的格式</h3>
-
         <div className="space-y-4">
-          {/* 文本格式说明 */}
           <div>
             <p className="text-sm font-medium text-blue-900 mb-1">1. 文本格式（推荐）</p>
             <pre className="text-xs text-blue-800 overflow-x-auto bg-white p-2 rounded">
@@ -313,8 +357,6 @@ Erewhon 实际上已经成为了孵化器。`}
             </pre>
             <p className="text-xs text-blue-700 mt-1">格式：时间戳 + 英文 + 中文，用空行分隔</p>
           </div>
-
-          {/* JSON格式说明 */}
           <div>
             <p className="text-sm font-medium text-blue-900 mb-1">2. JSON格式</p>
             <pre className="text-xs text-blue-800 overflow-x-auto bg-white p-2 rounded">
@@ -329,25 +371,82 @@ Erewhon 实际上已经成为了孵化器。`}
 ]`}
             </pre>
           </div>
+          <div>
+            <p className="text-sm font-medium text-blue-900 mb-1">3. Word 文档（.docx）</p>
+            <p className="text-xs text-blue-700">上传 Word 文件后，AI 将自动识别时间戳、英文和中文内容并转换为字幕格式</p>
+          </div>
         </div>
       </div>
 
-      {/* 上传表单 */}
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
-        {/* 文件上传 */}
+        {/* 文件上传区域 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            选择字幕文件（支持 .txt 或 .json）
-          </label>
-          <input
-            type="file"
-            accept=".txt,.json"
-            onChange={handleFileUpload}
-            className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            文本格式：时间戳 + 英文 + 中文，用空行分隔 | JSON格式：标准字幕数组
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-gray-700">
+              选择字幕文件（支持 .txt、.json 或 .docx）
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Word 转换模型：</span>
+              <select
+                value={aiModel}
+                onChange={(e) => setAiModel(e.target.value)}
+                className="text-xs border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+              >
+                {AI_MODELS.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            className={`
+              relative flex flex-col items-center justify-center w-full h-32 px-6
+              border-2 border-dashed rounded-xl cursor-pointer transition-all
+              ${dragOver
+                ? 'border-purple-400 bg-purple-50'
+                : selectedFileName
+                  ? 'border-green-400 bg-green-50'
+                  : 'border-gray-300 bg-gray-50 hover:border-purple-400 hover:bg-purple-50'
+              }
+            `}
+          >
+            {aiLoading ? (
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-purple-600 font-medium">AI 正在转换 Word 文档...</p>
+              </div>
+            ) : selectedFileName ? (
+              <div className="flex flex-col items-center gap-1">
+                <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm font-medium text-green-700">{selectedFileName}</p>
+                <p className="text-xs text-gray-500">点击重新选择文件</p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium text-purple-600">点击选择文件</span>
+                  <span className="text-gray-500"> 或拖拽到此处</span>
+                </p>
+                <p className="text-xs text-gray-400">.txt · .json · .docx（Word 文档将由 AI 自动转换）</p>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,.json,.docx"
+              onChange={handleFileInputChange}
+              className="hidden"
+            />
+          </div>
         </div>
 
         {/* 或者直接粘贴 */}
@@ -360,22 +459,18 @@ Erewhon 实际上已经成为了孵化器。`}
             onChange={(e) => {
               const content = e.target.value;
               setFileContent(content);
-
-              // 尝试解析
               try {
-                // 先尝试JSON
                 const parsed = normalizeSubtitleTimes(JSON.parse(content));
                 setFileType('json');
                 setPreviewData(parsed);
                 setError('');
               } catch {
-                // 如果不是JSON，尝试文本格式
                 try {
                   const parsed = parseTextFormat(content);
                   setFileType('text');
                   setPreviewData(parsed);
                   setError('');
-                } catch (err) {
+                } catch {
                   setPreviewData([]);
                 }
               }
@@ -407,7 +502,7 @@ Erewhon 实际上已经成为了孵化器。`}
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-4 py-2">{item.sequence}</td>
                       <td className="px-4 py-2 whitespace-nowrap">
-                        {item.start_time}s - {item.end_time}s
+                        {formatSeconds(item.start_time)} - {formatSeconds(item.end_time)}
                       </td>
                       <td className="px-4 py-2 truncate max-w-xs">{item.text_en}</td>
                       <td className="px-4 py-2 truncate max-w-xs">{item.text_zh}</td>

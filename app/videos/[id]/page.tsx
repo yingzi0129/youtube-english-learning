@@ -7,18 +7,6 @@ import { selectStorageUrl } from '@/lib/storage-urls';
 import VideoWithSubtitles from './components/VideoWithSubtitles';
 import VideoInfo from './components/VideoInfo';
 
-type LearningPoint = {
-  id: string;
-  type?: 'word' | 'phrase';
-  text: string;
-  // 0-based, end-exclusive indices into text_en for precise highlighting.
-  start: number;
-  end: number;
-  phonetic?: string;
-  meaning?: string;
-  helperSentence?: string;
-};
-
 export default async function VideoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   // 解包 params (Next.js 15+ 要求)
   const { id } = await params;
@@ -30,7 +18,7 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
 
   let videoQuery = supabase
     .from('videos')
-    .select('*')
+    .select('id, title, creator_name, difficulty, duration_minutes, description, video_url, video_url_cos, video_url_r2, tags, published_at, is_trial')
     .eq('id', id)
     .eq('is_deleted', false);
 
@@ -71,39 +59,6 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
     }),
   };
 
-  // 从数据库获取字幕数据
-  const { data: subtitlesData } = await supabase
-    .from('subtitles')
-    .select('*')
-    .eq('video_id', id)
-    .order('sequence', { ascending: true });
-
-  // 格式化字幕数据
-  const subtitles = (subtitlesData || []).map(sub => ({
-    id: sub.sequence,
-    dbId: sub.id, // 数据库 UUID，用于收藏功能
-    startTime: sub.start_time,
-    endTime: sub.end_time,
-    text: sub.text_en || '',
-    translation: sub.text_zh || '',
-    // Optional: manual seek offset (seconds). Negative means seek earlier.
-    seekOffset: Number.isFinite(Number(sub.seek_offset)) ? Number(sub.seek_offset) : 0,
-    // Optional: pre-annotated learning points (JSON from backend).
-    annotations: (() => {
-      const raw = (sub as any).annotations ?? (sub as any).learning_points ?? null;
-      if (!raw) return [] as LearningPoint[];
-      if (Array.isArray(raw)) return raw as LearningPoint[];
-      if (typeof raw === 'string') {
-        try {
-          const parsed = JSON.parse(raw);
-          return Array.isArray(parsed) ? (parsed as LearningPoint[]) : ([] as LearningPoint[]);
-        } catch {
-          return [] as LearningPoint[];
-        }
-      }
-      return [] as LearningPoint[];
-    })(),
-  }));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
@@ -134,7 +89,7 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
       {/* 主内容区域 */}
       <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 视频播放器和字幕面板 */}
-        <VideoWithSubtitles videoUrl={video.videoUrl} subtitles={subtitles} />
+        <VideoWithSubtitles videoUrl={video.videoUrl} initialSubtitles={[]} />
 
         {/* 视频介绍：仅桌面端显示（移动端不展示此卡片） */}
         <div className="hidden lg:block mt-6">
