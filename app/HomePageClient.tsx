@@ -37,7 +37,7 @@ export default function HomePageClient() {
   useEffect(() => {
     let cancelled = false;
     const videosController = new AbortController();
-    const videosPromise = fetch('/api/videos', { signal: videosController.signal }).catch((err: any) => {
+    const videosPromise = fetch('/api/videos?fields=card', { signal: videosController.signal }).catch((err: any) => {
       if (err?.name === 'AbortError') {
         return null;
       }
@@ -46,7 +46,7 @@ export default function HomePageClient() {
 
     const loadData = async () => {
       try {
-        const authResp = await fetch('/api/auth/me');
+        const authResp = await fetch('/api/auth/me?lite=1');
         if (!authResp.ok) {
           videosController.abort();
           router.push('/login');
@@ -76,8 +76,24 @@ export default function HomePageClient() {
 
         if (!cancelled) {
           setVideos(videosData?.videos || []);
-          // 加载收藏数据
-          fetchFavorites();
+          // 加载收藏数据（仅需要 IDs）
+          fetchFavorites(undefined, 'ids');
+        }
+
+        // 在后台补充角色信息，不阻塞首屏
+        if (!cancelled && authData?.role !== 'admin') {
+          setTimeout(async () => {
+            try {
+              const roleResp = await fetch('/api/auth/me');
+              if (!roleResp.ok) return;
+              const roleData: AuthResponse = await roleResp.json();
+              if (!cancelled) {
+                setIsAdmin(roleData?.role === 'admin');
+              }
+            } catch {
+              // ignore
+            }
+          }, 500);
         }
       } catch (err: any) {
         if (!cancelled) {

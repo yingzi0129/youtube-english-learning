@@ -93,7 +93,7 @@ export default function WordCardsPage() {
         }
         setUserId(user.id);
 
-        const response = await fetch('/api/videos');
+        const response = await fetch('/api/videos?fields=mini');
         const data = await response.json();
         if (!response.ok) {
           throw new Error(data?.error || '获取视频失败');

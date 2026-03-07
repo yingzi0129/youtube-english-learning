@@ -16,7 +16,7 @@ export default function FavoritesPage() {
   const [notesValue, setNotesValue] = useState('');
 
   useEffect(() => {
-    fetchFavorites();
+    fetchFavorites(undefined, 'full');
   }, [fetchFavorites]);
 
   // 按类型筛选收藏

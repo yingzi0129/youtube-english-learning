@@ -1,5 +1,13 @@
+import { Suspense } from 'react';
 import HomePageClient from './HomePageClient';
+import Loading from './loading';
 
-export default async function Home() {
-  return <HomePageClient />;
+export const dynamic = 'force-static';
+
+export default function Home() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <HomePageClient />
+    </Suspense>
+  );
 }

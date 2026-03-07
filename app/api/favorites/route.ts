@@ -20,16 +20,21 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get('type'); // 可选：筛选类型
     const videoId = searchParams.get('video_id'); // 可选：筛选特定视频
+    const mode = searchParams.get('mode'); // ids | full
 
     // 构建查询
     let query = supabase
       .from('favorites')
-      .select(`
-        *,
-        video:videos!favorites_video_id_fkey(id, title, thumbnail_url, duration_minutes),
-        vocabulary:vocabulary!favorites_vocabulary_id_fkey(id, text, phonetic, meaning, helper_sentence),
-        subtitle:subtitles!favorites_subtitle_id_fkey(id, text_en, text_zh, start_time, end_time)
-      `)
+      .select(
+        mode === 'ids'
+          ? 'id, type, video_id, vocabulary_id, subtitle_id'
+          : `
+            *,
+            video:videos!favorites_video_id_fkey(id, title, thumbnail_url, duration_minutes),
+            vocabulary:vocabulary!favorites_vocabulary_id_fkey(id, text, phonetic, meaning, helper_sentence),
+            subtitle:subtitles!favorites_subtitle_id_fkey(id, text_en, text_zh, start_time, end_time)
+          `
+      )
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -51,7 +56,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ data });
+    const response = NextResponse.json({ data });
+    response.headers.set(
+      'Cache-Control',
+      mode === 'ids'
+        ? 'private, max-age=30, stale-while-revalidate=60'
+        : 'private, max-age=10, stale-while-revalidate=30'
+    );
+    response.headers.set('Vary', 'Cookie');
+    return response;
   } catch (error) {
     console.error('获取收藏列表异常:', error);
     return NextResponse.json(

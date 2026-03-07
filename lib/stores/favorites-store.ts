@@ -8,7 +8,7 @@ interface FavoritesState {
   error: string | null;
 
   // Actions
-  fetchFavorites: (type?: FavoriteType) => Promise<void>;
+  fetchFavorites: (type?: FavoriteType, mode?: 'full' | 'ids') => Promise<void>;
   addFavorite: (request: CreateFavoriteRequest) => Promise<Favorite | null>;
   removeFavorite: (id: string) => Promise<boolean>;
   addFavoriteOptimistic: (request: CreateFavoriteRequest) => Promise<Favorite | null>;
@@ -24,12 +24,15 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
   loading: false,
   error: null,
 
-  fetchFavorites: async (type?: FavoriteType) => {
+  fetchFavorites: async (type?: FavoriteType, mode: 'full' | 'ids' = 'full') => {
     set({ loading: true, error: null });
     try {
       const params = new URLSearchParams();
       if (type) {
         params.append('type', type);
+      }
+      if (mode === 'ids') {
+        params.append('mode', 'ids');
       }
 
       const response = await fetch(`/api/favorites?${params.toString()}`);

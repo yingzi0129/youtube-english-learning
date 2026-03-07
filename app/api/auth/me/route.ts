@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isTrialUser } from '@/lib/auth/trial';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { data: { user }, error } = await supabase.auth.getUser();
@@ -11,7 +11,17 @@ export async function GET() {
       return NextResponse.json({ error: '未登录' }, { status: 401 });
     }
 
-    const { data: role } = await supabase.rpc('get_user_role');
+    const url = request.nextUrl;
+    const lite = url.searchParams.get('lite') === '1';
+    let role: string | null = null;
+
+    if (!lite) {
+      const { data: roleData } = await supabase.rpc('get_user_role');
+      role = roleData || 'user';
+    } else {
+      const roleHint = (user.user_metadata as any)?.role || (user.app_metadata as any)?.role;
+      role = roleHint || 'user';
+    }
 
     return NextResponse.json(
       {
@@ -22,7 +32,10 @@ export async function GET() {
       },
       {
         headers: {
-          'Cache-Control': 'no-store',
+          'Cache-Control': lite
+            ? 'private, max-age=30, stale-while-revalidate=60'
+            : 'private, max-age=10, stale-while-revalidate=30',
+          'Vary': 'Cookie',
         },
       }
     );

@@ -4,28 +4,78 @@ import { isTrialUser } from '@/lib/auth/trial';
 import { isMainlandChina } from '@/lib/region';
 import { selectStorageUrl } from '@/lib/storage-urls';
 
+type VideoRow = {
+  id: string;
+  title: string | null;
+  description?: string | null;
+  thumbnail_url?: string | null;
+  thumbnail_url_cos?: string | null;
+  thumbnail_url_r2?: string | null;
+  duration_minutes?: number | null;
+  creator_name?: string | null;
+  tags?: string[] | null;
+  difficulty?: string | null;
+  published_at?: string | null;
+  video_url?: string | null;
+  video_url_cos?: string | null;
+  video_url_r2?: string | null;
+};
+
+const toVideoRows = (data: unknown): VideoRow[] => {
+  if (!Array.isArray(data)) return [];
+  return data as VideoRow[];
+};
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
 
     const { data: { user } } = await supabase.auth.getUser();
     const isTrial = isTrialUser(user);
-
-    // 检查是否是管理员
-    let isAdmin = false;
-    if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-      isAdmin = profile?.role === 'admin';
-    }
+    const url = request.nextUrl;
+    const fields = (url.searchParams.get('fields') || 'full').toLowerCase();
+    const isMini = fields === 'mini';
+    const isCard = fields === 'card';
 
     // 从数据库获取所有未删除的视频，按发布时间倒序
+    const baseSelect = (() => {
+      if (isMini) return 'id, title';
+      if (isCard) {
+        return [
+          'id',
+          'title',
+          'description',
+          'thumbnail_url',
+          'thumbnail_url_cos',
+          'thumbnail_url_r2',
+          'duration_minutes',
+          'creator_name',
+          'tags',
+          'difficulty',
+          'published_at',
+        ].join(', ');
+      }
+      return [
+        'id',
+        'title',
+        'description',
+        'thumbnail_url',
+        'thumbnail_url_cos',
+        'thumbnail_url_r2',
+        'duration_minutes',
+        'creator_name',
+        'tags',
+        'difficulty',
+        'published_at',
+        'video_url',
+        'video_url_cos',
+        'video_url_r2',
+      ].join(', ');
+    })();
+
     let query = supabase
       .from('videos')
-      .select('*')
+      .select(baseSelect)
       .eq('is_deleted', false);
 
     if (isTrial) {
@@ -45,38 +95,62 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
+    const rows = toVideoRows(videos);
+
+    if (isMini) {
+      const response = NextResponse.json({
+        success: true,
+        videos: rows.map((video) => ({
+          id: video.id,
+          title: video.title || '',
+        })),
+      });
+      response.headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=1800');
+      response.headers.set('Vary', 'Cookie');
+      return response;
+    }
+
     const prefer = isMainlandChina(request.headers) ? 'cos' : 'r2';
 
     // 格式化视频数据，确保返回格式一致
-    const formattedVideos = videos.map((video) => {
-      const videoUrl = selectStorageUrl({
-        prefer,
-        primaryUrl: video.video_url,
-        cosUrl: video.video_url_cos,
-        r2Url: video.video_url_r2,
-      });
-
+    const formattedVideos = rows.map((video) => {
       const thumbnailUrl = selectStorageUrl({
         prefer,
-        primaryUrl: video.thumbnail_url,
-        cosUrl: video.thumbnail_url_cos,
-        r2Url: video.thumbnail_url_r2,
+        primaryUrl: video.thumbnail_url || undefined,
+        cosUrl: video.thumbnail_url_cos || undefined,
+        r2Url: video.thumbnail_url_r2 || undefined,
       });
 
-      return {
+      const base = {
         id: video.id,
-        title: video.title,
-        description: video.description,
+        title: video.title || '',
+        description: video.description || '',
         thumbnail: thumbnailUrl,
-        duration: `${video.duration_minutes}分钟`,
-        creator: video.creator_name,
+        duration: `${video.duration_minutes || 0}分钟`,
+        duration_minutes: video.duration_minutes || 0,
+        creator: video.creator_name || '',
         tags: video.tags || [],
-        difficulty: video.difficulty,
-        date: new Date(video.published_at).toLocaleDateString('zh-CN', {
+        difficulty: video.difficulty || '',
+        date: new Date(video.published_at || Date.now()).toLocaleDateString('zh-CN', {
           year: 'numeric',
           month: 'numeric',
           day: 'numeric',
         }).replace(/\//g, '/'),
+      };
+
+      if (isCard) {
+        return base;
+      }
+
+      const videoUrl = selectStorageUrl({
+        prefer,
+        primaryUrl: video.video_url || undefined,
+        cosUrl: video.video_url_cos || undefined,
+        r2Url: video.video_url_r2 || undefined,
+      });
+
+      return {
+        ...base,
         videoUrl,
       };
     });
@@ -86,12 +160,10 @@ export async function GET(request: NextRequest) {
       videos: formattedVideos,
     });
 
-    // 管理员：短缓存（10秒），方便看到最新上传的视频
-    // 普通用户：长缓存（10分钟），减少服务器压力
-    if (isAdmin) {
-      response.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30');
-    } else {
+    if (isCard) {
       response.headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=1800');
+    } else {
+      response.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
     }
     response.headers.set('Vary', 'Cookie');
     return response;

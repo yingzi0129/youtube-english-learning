@@ -34,17 +34,35 @@ export async function GET() {
     // 获取视频总数
     let videoQuery = supabase
       .from('videos')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('is_deleted', false);
 
     if (isTrial) {
       videoQuery = videoQuery.eq('is_trial', true);
     }
 
-    const { count: videoCount, error: videoError } = await videoQuery;
+    // 获取打卡总天数
+    const checkInQuery = supabase
+      .from('check_ins')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id);
 
-    if (videoError) {
-      console.error('获取视频总数错误:', videoError);
+    // 检查今日是否已打卡
+    const todayDate = getChinaDate();
+    const todayQuery = supabase
+      .from('check_ins')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('check_in_date', todayDate);
+
+    const [videoRes, checkInRes, todayRes] = await Promise.all([
+      videoQuery,
+      checkInQuery,
+      todayQuery,
+    ]);
+
+    if (videoRes.error) {
+      console.error('获取视频总数错误:', videoRes.error);
       const response = NextResponse.json(
         { error: '获取视频总数失败' },
         { status: 500 }
@@ -53,14 +71,8 @@ export async function GET() {
       return response;
     }
 
-    // 获取打卡总天数
-    const { count: checkInCount, error: checkInError } = await supabase
-      .from('check_ins')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id);
-
-    if (checkInError) {
-      console.error('获取打卡天数错误:', checkInError);
+    if (checkInRes.error) {
+      console.error('获取打卡天数错误:', checkInRes.error);
       const response = NextResponse.json(
         { error: '获取打卡天数失败' },
         { status: 500 }
@@ -69,18 +81,8 @@ export async function GET() {
       return response;
     }
 
-    // 检查今日是否已打卡
-    const todayDate = getChinaDate();
-    const { data: todayCheckIn, error: todayError } = await supabase
-      .from('check_ins')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('check_in_date', todayDate)
-      .single();
-
-    if (todayError && todayError.code !== 'PGRST116') {
-      // PGRST116 表示没有找到记录，这是正常的
-      console.error('检查今日打卡错误:', todayError);
+    if (todayRes.error) {
+      console.error('检查今日打卡错误:', todayRes.error);
       const response = NextResponse.json(
         { error: '检查今日打卡失败' },
         { status: 500 }
@@ -90,11 +92,11 @@ export async function GET() {
     }
 
     const response = NextResponse.json({
-      videoCount: videoCount || 0,
-      checkInDays: checkInCount || 0,
-      hasCheckedInToday: !!todayCheckIn,
+      videoCount: videoRes.count || 0,
+      checkInDays: checkInRes.count || 0,
+      hasCheckedInToday: (todayRes.count || 0) > 0,
     });
-    response.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30');
+    response.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
     response.headers.set('Vary', 'Cookie');
     return response;
   } catch (error) {
