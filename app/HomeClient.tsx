@@ -30,9 +30,10 @@ interface HomeClientProps {
     content: string;
   } | null;
   isLoading?: boolean;
+  statsDelayMs?: number;
 }
 
-export default function HomeClient({ isAdmin, videos, error, userLabel, notice, isLoading = false }: HomeClientProps) {
+export default function HomeClient({ isAdmin, videos, error, userLabel, notice, isLoading = false, statsDelayMs = 0 }: HomeClientProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({
     difficulty: '全部',
@@ -106,7 +107,7 @@ export default function HomeClient({ isAdmin, videos, error, userLabel, notice, 
       {/* 顶部统计区域 - 全宽展示 */}
       <div className="bg-white/60 backdrop-blur-md border-b border-purple-100/50 shadow-sm">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-6">
-          <LearningStats />
+          <LearningStats delayMs={statsDelayMs} />
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import useSWR from 'swr';
 
@@ -19,13 +19,23 @@ const fetcher = async (url: string) => {
   return response.json();
 };
 
-export default function LearningStats() {
+export default function LearningStats({ delayMs = 0 }: { delayMs?: number }) {
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [enabled, setEnabled] = useState(delayMs <= 0);
+
+  useEffect(() => {
+    if (delayMs <= 0) {
+      setEnabled(true);
+      return;
+    }
+    const timer = setTimeout(() => setEnabled(true), delayMs);
+    return () => clearTimeout(timer);
+  }, [delayMs]);
 
   // 使用 SWR 获取数据，带缓存
   const { data: stats, mutate } = useSWR<StatsData>(
-    '/api/check-ins/stats',
+    enabled ? '/api/check-ins/stats' : null,
     fetcher,
     {
       revalidateOnFocus: false, // 窗口聚焦时不重新验证

@@ -33,9 +33,16 @@ export default function HomePageClient() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userLabel, setUserLabel] = useState<string | undefined>(undefined);
   const { fetchFavorites } = useFavoritesStore();
+  const isMobile = typeof window !== 'undefined'
+    ? window.matchMedia('(max-width: 768px)').matches
+      || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    : false;
+  const favoritesDelayMs = isMobile ? 1200 : 0;
+  const statsDelayMs = isMobile ? 1500 : 0;
 
   useEffect(() => {
     let cancelled = false;
+    let favoritesTimer: ReturnType<typeof setTimeout> | null = null;
     const videosController = new AbortController();
     const videosPromise = fetch('/api/videos?fields=card', { signal: videosController.signal }).catch((err: any) => {
       if (err?.name === 'AbortError') {
@@ -77,7 +84,15 @@ export default function HomePageClient() {
         if (!cancelled) {
           setVideos(videosData?.videos || []);
           // 加载收藏数据（仅需要 IDs）
-          fetchFavorites(undefined, 'ids');
+          if (favoritesDelayMs > 0) {
+            favoritesTimer = setTimeout(() => {
+              if (!cancelled) {
+                fetchFavorites(undefined, 'ids');
+              }
+            }, favoritesDelayMs);
+          } else {
+            fetchFavorites(undefined, 'ids');
+          }
         }
 
         // 在后台补充角色信息，不阻塞首屏
@@ -109,9 +124,12 @@ export default function HomePageClient() {
     loadData();
     return () => {
       cancelled = true;
+      if (favoritesTimer) {
+        clearTimeout(favoritesTimer);
+      }
       videosController.abort();
     };
-  }, [router, fetchFavorites]);
+  }, [router, fetchFavorites, favoritesDelayMs]);
 
   return (
     <HomeClient
@@ -120,6 +138,7 @@ export default function HomePageClient() {
       error={error}
       userLabel={userLabel}
       isLoading={isLoading}
+      statsDelayMs={statsDelayMs}
     />
   );
 }
