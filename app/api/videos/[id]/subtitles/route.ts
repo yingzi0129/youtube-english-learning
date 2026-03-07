@@ -5,6 +5,8 @@ import { isTrialUser } from '@/lib/auth/trial';
 export const runtime = 'nodejs';
 
 type RouteParams = { id: string } | Promise<{ id: string }>;
+type QueryResult = { data: unknown | null; error: any };
+type QueryRunner = (selectFields: string) => unknown;
 
 type SubtitleRow = {
   id: string;
@@ -82,6 +84,11 @@ const parseAnnotations = (row: SubtitleRow) => {
   return [];
 };
 
+const toRows = (data: unknown): SubtitleRow[] => {
+  if (!Array.isArray(data)) return [];
+  return data as SubtitleRow[];
+};
+
 const isMissingColumnError = (error: any) => {
   const message = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
   if (message.includes('column') && message.includes('does not exist')) return true;
@@ -89,13 +96,11 @@ const isMissingColumnError = (error: any) => {
   return false;
 };
 
-const fetchWithFallback = async <T>(
-  builder: (selectFields: string) => Promise<{ data: T | null; error: any }>
-) => {
-  const full = await builder(SELECT_FIELDS_FULL);
+const fetchWithFallback = async (builder: QueryRunner): Promise<QueryResult> => {
+  const full = await Promise.resolve(builder(SELECT_FIELDS_FULL)) as QueryResult;
   if (!full.error) return full;
   if (isMissingColumnError(full.error)) {
-    return builder(SELECT_FIELDS_MIN);
+    return (await Promise.resolve(builder(SELECT_FIELDS_MIN))) as QueryResult;
   }
   return full;
 };
@@ -190,8 +195,8 @@ export async function GET(request: NextRequest, { params }: { params: RouteParam
         return NextResponse.json({ error: 'Failed to load subtitles.' }, { status: 500 });
       }
 
-      const afterRows = (afterRes.data || []) as SubtitleRow[];
-      const beforeRows = (beforeRes.data || []) as SubtitleRow[];
+      const afterRows = toRows(afterRes.data);
+      const beforeRows = toRows(beforeRes.data);
 
       const hasMoreAfter = afterRows.length > limit;
       const hasMoreBefore = beforeRows.length > back;
@@ -213,18 +218,19 @@ export async function GET(request: NextRequest, { params }: { params: RouteParam
     }
 
     if (after != null || before != null) {
-      let query = subtitlesTable.eq('video_id', videoId);
-
       if (after != null) {
-        query = query.gt('sequence', after);
-        query = query.order('sequence', { ascending: true }).limit(limit + 1);
         const { data, error } = await fetchWithFallback((fields) =>
-          query.select(fields)
+          subtitlesTable
+            .select(fields)
+            .eq('video_id', videoId)
+            .gt('sequence', after)
+            .order('sequence', { ascending: true })
+            .limit(limit + 1)
         );
         if (error) {
           return NextResponse.json({ error: 'Failed to load subtitles.' }, { status: 500 });
         }
-        const rows = (data || []) as SubtitleRow[];
+        const rows = toRows(data);
         const hasMoreAfter = rows.length > limit;
         const trimmed = rows.slice(0, limit).map(mapSubtitle);
         const response = NextResponse.json(
@@ -239,15 +245,18 @@ export async function GET(request: NextRequest, { params }: { params: RouteParam
       }
 
       if (before != null) {
-        query = query.lt('sequence', before);
-        query = query.order('sequence', { ascending: false }).limit(limit + 1);
         const { data, error } = await fetchWithFallback((fields) =>
-          query.select(fields)
+          subtitlesTable
+            .select(fields)
+            .eq('video_id', videoId)
+            .lt('sequence', before)
+            .order('sequence', { ascending: false })
+            .limit(limit + 1)
         );
         if (error) {
           return NextResponse.json({ error: 'Failed to load subtitles.' }, { status: 500 });
         }
-        const rows = (data || []) as SubtitleRow[];
+        const rows = toRows(data);
         const hasMoreBefore = rows.length > limit;
         const trimmed = rows.slice(0, limit).reverse().map(mapSubtitle);
         const response = NextResponse.json(
@@ -274,7 +283,7 @@ export async function GET(request: NextRequest, { params }: { params: RouteParam
       return NextResponse.json({ error: 'Failed to load subtitles.' }, { status: 500 });
     }
 
-    const rows = (data || []) as SubtitleRow[];
+    const rows = toRows(data);
     const hasMoreAfter = rows.length > limit;
     const trimmed = rows.slice(0, limit).map(mapSubtitle);
     const response = NextResponse.json(
