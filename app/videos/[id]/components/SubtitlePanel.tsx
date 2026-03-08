@@ -1,4 +1,4 @@
-'use client';
+﻿﻿﻿﻿﻿'use client';
 
 import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 
 interface Subtitle {
   id: number;
-  dbId?: string; // 数据库 UUID，用于收藏功能
+  dbId?: string; // 数据库字幕 ID（UUID），用于收藏功能
   startTime: number;
   endTime: number;
   text: string;
@@ -16,7 +16,6 @@ interface Subtitle {
   seekOffset?: number;
   annotations?: LearningPoint[];
 }
-
 type VideoLoopMode = 'single' | 'loop';
 type SentenceLoopMode = 'continuous' | 'single';
 type LoopCount = 1 | 2 | 3 | -1;
@@ -42,9 +41,9 @@ interface SubtitlePanelProps {
   onLoadAfter?: () => void;
   onLoadBefore?: () => void;
   currentTime?: number;
-  // New: seek by subtitle id (supports smart backtracking in parent).
+  // 新增：按字幕 ID 跳转（支持父组件的智能回退）
   onSeekToSubtitle?: (subtitleId: number) => void;
-  onSeek?: (time: number) => void; // fallback
+  onSeek?: (time: number) => void; // 备用方案
   onPlayOriginal?: (subtitleId: number) => void;
   videoLoopMode: VideoLoopMode;
   onVideoLoopModeChange: (mode: VideoLoopMode) => void;
@@ -96,16 +95,19 @@ export default function SubtitlePanel({
   isClozeMode,
   onClozeModeChange,
 }: SubtitlePanelProps) {
-  const subtitleListRef = useRef<HTMLDivElement>(null);
-  const topSentinelRef = useRef<HTMLDivElement>(null);
-  const bottomSentinelRef = useRef<HTMLDivElement>(null);
+  const desktopListRef = useRef<HTMLDivElement>(null);
+  const desktopTopSentinelRef = useRef<HTMLDivElement>(null);
+  const desktopBottomSentinelRef = useRef<HTMLDivElement>(null);
+  const mobileListRef = useRef<HTMLDivElement>(null);
+  const mobileTopSentinelRef = useRef<HTMLDivElement>(null);
+  const mobileBottomSentinelRef = useRef<HTMLDivElement>(null);
   const [pinnedSubtitleId, setPinnedSubtitleId] = useState<number | null>(null);
 
-  // Cloze (fill-in) mode: mask all annotated learning points until revealed by click.
-  // Keyed by `${subtitleId}:${learningPointId}` to avoid collisions across subtitles.
+  // 填空模式：默认遮挡所有学习点，点击后显示
+  // 使用 `${subtitleId}:${learningPointId}` 作为键，避免跨字幕冲突
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
 
-  // Word card popover state (desktop-focused; uses a portal to avoid clipping).
+  // 单词卡弹层状态（桌面端为主，使用 Portal 避免裁切）
   const [cardPoint, setCardPoint] = useState<LearningPoint | null>(null);
   const [cardAnchor, setCardAnchor] = useState<DOMRect | null>(null);
   const [isCardMounted, setIsCardMounted] = useState(false);
@@ -114,13 +116,15 @@ export default function SubtitlePanel({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const showPronunciationButton = false;
   const [isExporting, setIsExporting] = useState(false);
+  // Tab 切换状态（仅桌面端使用）
+  const [activeTab, setActiveTab] = useState<'subtitle' | 'loop' | 'practice'>('subtitle');
 
   useEffect(() => {
-    // Portal requires DOM.
+    // Portal 需要在浏览器 DOM 中挂载
     setIsCardMounted(true);
   }, []);
 
-  // When entering cloze mode, reset reveal progress (per requirement: everything masked until clicked).
+  // 进入填空模式时重置显示状态（按要求：点击前全部遮挡）
   useEffect(() => {
     if (isClozeMode) {
       setRevealed({});
@@ -129,7 +133,7 @@ export default function SubtitlePanel({
     }
   }, [isClozeMode]);
 
-  // 根据当前播放时间计算激活的字幕ID
+  // 根据当前播放时间计算激活的字幕 ID
   const activeSubtitleIdByTime = useMemo(() => {
     const activeSubtitle = subtitles.find(
       (sub) => currentTime >= sub.startTime && currentTime < sub.endTime
@@ -137,8 +141,8 @@ export default function SubtitlePanel({
     return activeSubtitle?.id || null;
   }, [currentTime, subtitles]);
 
-  // When we seek slightly earlier than a subtitle's start (smart backtracking),
-  // keep the clicked subtitle highlighted until playback reaches its start time.
+  // 智能回退：当回退到字幕开始前一点时，保持点击字幕高亮
+  // 直到播放时间到达该字幕的起始时间
   const pinnedStartTime = useMemo(() => {
     if (pinnedSubtitleId == null) return null;
     return subtitles.find((s) => s.id === pinnedSubtitleId)?.startTime ?? null;
@@ -175,7 +179,7 @@ export default function SubtitlePanel({
     setCardPos(null);
   };
 
-  // Close popover on outside click / scroll / resize (desktop UX).
+  // 桌面端：点击外部/滚动/缩放时关闭弹层
   useEffect(() => {
     if (!cardPoint) return;
 
@@ -208,10 +212,10 @@ export default function SubtitlePanel({
     let left = cardAnchor.left;
     let top = cardAnchor.bottom + 10;
 
-    // Clamp horizontally.
+    // 横向限制在视口内
     left = Math.min(Math.max(margin, left), window.innerWidth - rect.width - margin);
 
-    // Prefer below; if not enough room, show above.
+    // 优先显示在下方，空间不足时显示在上方
     if (top + rect.height + margin > window.innerHeight) {
       top = cardAnchor.top - rect.height - 10;
     }
@@ -242,7 +246,7 @@ export default function SubtitlePanel({
     setCardPoint(point);
     const rect = anchorEl.getBoundingClientRect();
     setCardAnchor(rect);
-    // Initial position (may be adjusted after measuring the card).
+    // 初始位置（测量卡片后可能调整）
     setCardPos({
       top: Math.round(rect.bottom + 10),
       left: Math.round(rect.left),
@@ -289,7 +293,7 @@ export default function SubtitlePanel({
           const data = await response.json();
           if (data?.error) errorMessage = data.error;
         } catch {
-          // ignore
+          // 忽略
         }
         throw new Error(errorMessage);
       }
@@ -333,7 +337,7 @@ export default function SubtitlePanel({
       .filter((p) => p.end <= text.length)
       .sort((a, b) => (a.start - b.start) || (b.end - b.start) - (a.end - a.start));
 
-    // Drop overlaps: keep the earliest/longest-at-same-start.
+    // 去重重叠：保留起始最早或同起点更长的项
     const out: LearningPoint[] = [];
     let cursor = 0;
     for (const p of safe) {
@@ -386,7 +390,7 @@ export default function SubtitlePanel({
               (e.currentTarget as HTMLElement).click();
             }
           }}
-          title={isMasked ? '点击揭晓' : '点击查看释义'}
+          title={isMasked ? '点击显示' : '点击查看释义'}
         >
           {segment}
         </span>
@@ -399,39 +403,45 @@ export default function SubtitlePanel({
     return nodes;
   };
 
-  // 自动滚动字幕列表：当激活字幕靠近底部不在可视区域时，将其滚动到列表顶部位置
-  useEffect(() => {
-    if (activeSubtitleId == null) return;
+  // 自动滚动字幕列表：当激活字幕接近底部或超出可视区时，滚动到列表顶部附近
+  const getActiveListParts = () => {
+    const desktop = {
+      container: desktopListRef.current,
+      top: desktopTopSentinelRef.current,
+      bottom: desktopBottomSentinelRef.current,
+    };
+    const mobile = {
+      container: mobileListRef.current,
+      top: mobileTopSentinelRef.current,
+      bottom: mobileBottomSentinelRef.current,
+    };
+    const isVisible = (el: HTMLElement | null) => !!el && el.offsetParent !== null;
+    if (isVisible(desktop.container)) return desktop;
+    if (isVisible(mobile.container)) return mobile;
+    return desktop.container ? desktop : mobile;
+  };
 
-    const container = subtitleListRef.current;
-    if (!container) return;
+  const scrollToActiveSubtitle = (behavior: ScrollBehavior = 'smooth') => {
+    if (activeSubtitleId == null) return false;
+
+    const { container } = getActiveListParts();
+    if (!container) return false;
 
     const el = container.querySelector<HTMLElement>(`[data-subtitle-id="${activeSubtitleId}"]`);
-    if (!el) return;
-
-    const elRect = el.getBoundingClientRect();
+    if (!el) return false;
 
     const computed = window.getComputedStyle(container);
-    const paddingTop = Number.parseFloat(computed.paddingTop || '0') || 0;
     const overflowY = computed.overflowY;
     const isScrollable =
       (overflowY === 'auto' || overflowY === 'scroll') &&
       container.scrollHeight > container.clientHeight + 1;
 
     if (isScrollable) {
-      const containerRect = container.getBoundingClientRect();
-
-      // When active subtitle enters the lower part of the container viewport (or is above), snap it to the top.
-      const topThreshold = containerRect.top + paddingTop;
-      const lowerThreshold = containerRect.top + containerRect.height * 0.65;
-
-      if (elRect.top < topThreshold || elRect.top > lowerThreshold) {
-        const targetTop = container.scrollTop + (elRect.top - containerRect.top) - paddingTop;
-        container.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
-      }
+      // 直接让容器滚到当前字幕，避免计算误差
+      el.scrollIntoView({ behavior, block: 'center', inline: 'nearest' });
     } else {
-      // Mobile layout: list is not scrollable; scroll the page instead.
-      // Keep the active subtitle close to the top, below the sticky header.
+      // 移动端列表不滚动时，改为滚动页面，确保当前字幕在吸顶视频下方
+      const elRect = el.getBoundingClientRect();
       const stickyVideo = document.querySelector<HTMLElement>('[data-sticky-video="true"]');
       const stickyBottom = stickyVideo?.getBoundingClientRect().bottom;
       const topOffset = (typeof stickyBottom === 'number' ? stickyBottom : 88) + 12;
@@ -439,16 +449,41 @@ export default function SubtitlePanel({
 
       if (elRect.top < topOffset || elRect.top > lowerThreshold) {
         const targetTop = window.scrollY + elRect.top - topOffset;
-        window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+        window.scrollTo({ top: Math.max(0, targetTop), behavior });
       }
     }
-  }, [activeSubtitleId]);
+
+    return true;
+  };
+
+  // 自动滚动字幕列表：字幕异步加载完成后也要触发一次定位
+  useEffect(() => {
+    if (activeTab !== 'subtitle') return;
+    if (activeSubtitleId == null) return;
+
+    let raf1 = 0;
+    let raf2 = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => {
+        const ok = scrollToActiveSubtitle('smooth');
+        if (!ok) {
+          retryTimer = setTimeout(() => scrollToActiveSubtitle('smooth'), 120);
+        }
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(raf1);
+      window.cancelAnimationFrame(raf2);
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [activeSubtitleId, subtitles.length, activeTab]);
 
   useEffect(() => {
     if (!onLoadAfter && !onLoadBefore) return;
-    const container = subtitleListRef.current;
-    const top = topSentinelRef.current;
-    const bottom = bottomSentinelRef.current;
+    const { container, top, bottom } = getActiveListParts();
     if (!top && !bottom) return;
 
     const root = (() => {
@@ -483,11 +518,8 @@ export default function SubtitlePanel({
   // 控制下拉菜单显示
   const [showLoopMenu, setShowLoopMenu] = useState(false);
   const [showPracticeMenu, setShowPracticeMenu] = useState(false);
-  // 存储已有的录音记录
+  // 保存已有的录音记录
   const [existingRecordings, setExistingRecordings] = useState<Record<number, string>>({});
-  // Tab 切换状态（仅桌面端使用）
-  const [activeTab, setActiveTab] = useState<'subtitle' | 'loop' | 'practice'>('subtitle');
-
   // 加载已有的录音记录
   useEffect(() => {
     const loadRecordings = async () => {
@@ -538,7 +570,7 @@ export default function SubtitlePanel({
     if (onSeek) onSeek(startTime);
   };
 
-  // 格式化时间显示（秒转为 mm:ss 格式）
+  // 格式化时间显示（秒转为 mm:ss）
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -549,7 +581,7 @@ export default function SubtitlePanel({
     <React.Fragment>
       <div className="bg-white/90 backdrop-blur-md rounded-3xl shadow-lg border border-purple-100/50 overflow-hidden lg:sticky lg:top-24">
 
-      {/* 桌面端：Tab 标签导航 */}
+      
       <div className="hidden lg:flex bg-white/90 backdrop-blur-md border-b-2 border-gray-200">
         <button
           onClick={() => setActiveTab('subtitle')}
@@ -601,20 +633,19 @@ export default function SubtitlePanel({
         </button>
       </div>
 
-      {/* 移动端：简化的标题（移除功能图标） */}
+      
       <div className="lg:hidden px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
         <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
           <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
           </svg>
-          动态字幕
-        </h2>
+          动态字幕        </h2>
       </div>
-      {/* 桌面端：Tab 内容区域 */}
-      {/* 字幕 Tab */}
+      
+      
       {activeTab === 'subtitle' && (
         <div className="hidden lg:block">
-          {/* 语言切换按钮 */}
+          
           <div className="px-4 lg:px-6 py-3 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
             <div className="flex items-center gap-2">
               <button
@@ -657,12 +688,12 @@ export default function SubtitlePanel({
             </div>
           </div>
 
-          {/* 字幕列表 */}
+          
           <div
-            ref={subtitleListRef}
+            ref={desktopListRef}
             className="p-4 space-y-3 h-[600px] overflow-y-auto"
           >
-            <div ref={topSentinelRef} />
+            <div ref={desktopTopSentinelRef} />
             {hasMoreBefore && subtitles.length > 0 && (
               <div className="text-center text-xs text-gray-400">向上滚动加载更早字幕</div>
             )}
@@ -688,7 +719,7 @@ export default function SubtitlePanel({
                   `}
                   onClick={() => handleSubtitleClick(subtitle.id, subtitle.startTime)}
                 >
-                  {/* 时间戳和收藏按钮 */}
+                  
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2">
                       <span
@@ -704,8 +735,7 @@ export default function SubtitlePanel({
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                           </svg>
-                          播放中
-                        </span>
+                          播放中                        </span>
                       )}
                     </div>
                     {subtitle.dbId && (
@@ -720,7 +750,7 @@ export default function SubtitlePanel({
                     )}
                   </div>
 
-                  {/* 英文字幕 */}
+                  
                   {(subtitleMode === 'bilingual' || subtitleMode === 'english') && (
                     <p
                       className={`
@@ -734,7 +764,7 @@ export default function SubtitlePanel({
                     </p>
                   )}
 
-                  {/* 中文翻译 */}
+                  
                   {(subtitleMode === 'bilingual' || subtitleMode === 'chinese') && (
                     <p
                       className={`
@@ -748,7 +778,7 @@ export default function SubtitlePanel({
                     </p>
                   )}
 
-                  {/* 口语练习录音控件 */}
+                  
                   {isPracticeMode && (
                     <div className="mt-3 pt-3 border-t border-gray-200">
                       <AudioRecorder
@@ -765,7 +795,7 @@ export default function SubtitlePanel({
                 </div>
               );
             })}
-            <div ref={bottomSentinelRef} />
+            <div ref={desktopBottomSentinelRef} />
             {subtitles.length > 0 && (isLoadingSubtitles || hasMoreAfter) && (
               <div className="py-2 text-center text-xs text-gray-500">
                 {isLoadingSubtitles ? '正在加载更多字幕...' : '继续向下滚动加载更多'}
@@ -775,11 +805,10 @@ export default function SubtitlePanel({
         </div>
       )}
 
-      {/* 循环 Tab */}
+      
       {activeTab === 'loop' && (
         <div className="hidden lg:block">
           <div className="p-6 space-y-4 h-[600px] overflow-y-auto">
-            {/* 视频循环模式 */}
             <div>
               <div className="text-xs font-semibold text-gray-500 uppercase mb-3">视频循环</div>
               <div className="space-y-2">
@@ -810,7 +839,6 @@ export default function SubtitlePanel({
 
             <div className="border-t border-gray-200 my-4"></div>
 
-            {/* 句子循环模式 */}
             <div>
               <div className="text-xs font-semibold text-gray-500 uppercase mb-3">句子循环</div>
               <div className="space-y-2">
@@ -839,53 +867,33 @@ export default function SubtitlePanel({
               </div>
             </div>
 
-            {/* 循环次数选择（仅在单句循环模式下显示）*/}
             {sentenceLoopMode === 'single' && (
               <>
                 <div className="border-t border-gray-200 my-4"></div>
-                <div>
+                <div className="space-y-2">
                   <div className="text-xs font-semibold text-gray-500 uppercase mb-3">循环次数</div>
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-4 gap-2">
                     {[1, 2, 3, -1].map((count) => (
                       <button
                         key={count}
                         onClick={() => onLoopCountChange(count as LoopCount)}
-                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all flex items-center justify-between ${
+                        className={`px-3 py-2 text-xs rounded-lg border transition-all ${
                           loopCount === count
-                            ? 'bg-purple-50 text-purple-700 font-medium border-2 border-purple-200'
-                            : 'bg-white text-gray-700 hover:bg-purple-50 border-2 border-gray-200'
+                            ? 'bg-purple-50 text-purple-700 border-purple-200'
+                            : 'bg-white text-gray-600 border-gray-200 hover:bg-purple-50'
                         }`}
                       >
-                        <span>{count === -1 ? '无限循环' : `${count} 次`}</span>
-                        {loopCount === count && <span className="text-purple-600 text-lg">✓</span>}
+                        {count === -1 ? '无限' : `${count}次`}
                       </button>
                     ))}
                   </div>
-                </div>
-
-                <div className="border-t border-gray-200 my-4"></div>
-
-                {/* 自动下一句开关*/}
-                <div className="bg-white rounded-xl border-2 border-gray-200 p-4">
-                  <button
-                    onClick={() => onAutoNextSentenceChange(!autoNextSentence)}
-                    className="w-full flex items-center justify-between"
-                  >
-                    <span className="text-sm font-medium text-gray-700">自动下一句</span>
-                    <div className={`w-12 h-6 rounded-full transition-colors ${autoNextSentence ? 'bg-purple-600' : 'bg-gray-300'}`}>
-                      <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform mt-0.5 ${autoNextSentence ? 'ml-6' : 'ml-0.5'}`}></div>
+                  <div className="bg-purple-50 rounded-xl p-4 text-center">
+                    <div className="text-xs text-gray-500 mb-1">当前循环进度</div>
+                    <div className="text-lg font-bold text-purple-600">
+                      {loopCount === -1
+                        ? `第 ${currentLoopIndex + 1} 次`
+                        : `第 ${currentLoopIndex + 1} / ${loopCount} 次`}
                     </div>
-                  </button>
-                </div>
-
-                {/* 当前循环次数显示 */}
-                <div className="bg-purple-50 rounded-xl p-4 text-center">
-                  <div className="text-xs text-gray-500 mb-1">当前循环进度</div>
-                  <div className="text-lg font-bold text-purple-600">
-                    {loopCount === -1
-                      ? `第${currentLoopIndex + 1} 次`
-                      : `第${currentLoopIndex + 1} / ${loopCount} 次`
-                    }
                   </div>
                 </div>
               </>
@@ -894,7 +902,7 @@ export default function SubtitlePanel({
         </div>
       )}
 
-      {/* 练习 Tab */}
+      
       {activeTab === 'practice' && (
         <div className="hidden lg:block">
           <div className="p-6 space-y-4 h-[600px] overflow-y-auto">
@@ -939,8 +947,8 @@ export default function SubtitlePanel({
                   <div className="text-sm text-blue-800">
                     <div className="font-semibold mb-1">提示</div>
                     <div>
-                      {isPracticeMode && '切换到"字幕"标签页开始跟读练习'}
-                      {isClozeMode && !isPracticeMode && '切换到"字幕"标签页查看填空练习'}
+                      {isPracticeMode && '切换到“字幕”标签页开始跟读练习'}
+                      {isClozeMode && !isPracticeMode && '切换到“字幕”标签页查看填空练习'}
                     </div>
                   </div>
                 </div>
@@ -950,16 +958,16 @@ export default function SubtitlePanel({
         </div>
       )}
 
-      {/* 移动端：字幕列表（保持原样） */}
+      
       <div className="lg:hidden">
-        {/* 字幕列表 */}
+        
         <div
-          ref={subtitleListRef}
+          ref={mobileListRef}
           className={`p-3 space-y-2 ${
           themeMode === 'dark' ? 'bg-gray-900' : ''
         }`}
         >
-          <div ref={topSentinelRef} />
+          <div ref={mobileTopSentinelRef} />
           {hasMoreBefore && subtitles.length > 0 && (
             <div className={`text-center text-xs ${themeMode === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
               向上滚动加载更早字幕
@@ -991,7 +999,7 @@ export default function SubtitlePanel({
                 `}
                 onClick={() => handleSubtitleClick(subtitle.id, subtitle.startTime)}
               >
-                {/* 时间戳和收藏按钮 */}
+                
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2">
                     <span
@@ -1016,8 +1024,7 @@ export default function SubtitlePanel({
                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                         </svg>
-                        播放中
-                      </span>
+                        播放中                      </span>
                     )}
                   </div>
                   {subtitle.dbId && (
@@ -1032,7 +1039,7 @@ export default function SubtitlePanel({
                   )}
                 </div>
 
-                {/* 英文字幕 */}
+                
                 {(subtitleMode === 'bilingual' || subtitleMode === 'english') && (
                   <p
                     className={`
@@ -1054,7 +1061,7 @@ export default function SubtitlePanel({
                   </p>
                 )}
 
-                {/* 中文翻译 */}
+                
                 {(subtitleMode === 'bilingual' || subtitleMode === 'chinese') && (
                   <p
                     className={`
@@ -1075,7 +1082,7 @@ export default function SubtitlePanel({
                   </p>
                 )}
 
-                {/* 口语练习录音控件 */}
+                
                 {isPracticeMode && (
                   <div className={`mt-2 pt-2 ${
                     themeMode === 'dark' ? 'border-gray-700' : 'border-gray-200'
@@ -1094,7 +1101,7 @@ export default function SubtitlePanel({
               </div>
             );
           })}
-          <div ref={bottomSentinelRef} />
+          <div ref={mobileBottomSentinelRef} />
           {subtitles.length > 0 && (isLoadingSubtitles || hasMoreAfter) && (
             <div className={`py-2 text-center text-xs ${themeMode === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
               {isLoadingSubtitles ? '正在加载更多字幕...' : '继续向下滚动加载更多'}
@@ -1117,7 +1124,7 @@ export default function SubtitlePanel({
                   <div className="text-2xl font-bold text-gray-900 break-words">
                     {cardPoint.text}
                   </div>
-                  {/* 收藏按钮 */}
+                  
                   <div onClick={(e) => e.stopPropagation()}>
                     <FavoriteButton
                       type="vocabulary"
@@ -1162,7 +1169,7 @@ export default function SubtitlePanel({
 
             {cardPoint.meaning && (
               <div className="mt-4">
-                <div className="text-xs font-semibold text-gray-500 uppercase">释义</div>
+                <div className="text-xs font-semibold text-gray-500 uppercase">閲婁箟</div>
                 <div className="mt-1 text-base font-semibold text-gray-900 leading-relaxed break-words">
                   {cardPoint.meaning}
                 </div>
@@ -1171,7 +1178,7 @@ export default function SubtitlePanel({
 
             {cardPoint.helperSentence && (
               <div className="mt-4">
-                <div className="text-xs font-semibold text-gray-500 uppercase">用法</div>
+                <div className="text-xs font-semibold text-gray-500 uppercase">鐢ㄦ硶</div>
                 <div className="mt-2 inline-block max-w-full rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-800 break-words">
                   {cardPoint.helperSentence}
                 </div>

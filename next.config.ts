@@ -5,15 +5,19 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**.cos.ap-guangzhou.myqcloud.com',
-      },
-      {
-        protocol: 'https',
-        hostname: '**.r2.cloudflarestorage.com',
+        hostname: '**.myqcloud.com',
       },
       {
         protocol: 'https',
         hostname: 'youtube-1317088148.cos.ap-guangzhou.myqcloud.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.speak-video.cn',
+      },
+      {
+        protocol: 'https',
+        hostname: 'video.speak-video.cn',
       },
     ],
   },

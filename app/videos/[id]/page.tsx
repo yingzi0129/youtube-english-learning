@@ -1,14 +1,12 @@
-import { notFound } from 'next/navigation';
-import { headers } from 'next/headers';
+﻿import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { isTrialUser } from '@/lib/auth/trial';
-import { isMainlandChina } from '@/lib/region';
 import { selectStorageUrl } from '@/lib/storage-urls';
 import VideoWithSubtitles from './components/VideoWithSubtitles';
 import VideoInfo from './components/VideoInfo';
 
 export default async function VideoDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  // 解包 params (Next.js 15+ 要求)
+  // 解包 params（Next.js 15+ 要求）
   const { id } = await params;
 
   // 从数据库获取视频数据
@@ -18,7 +16,7 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
 
   let videoQuery = supabase
     .from('videos')
-    .select('id, title, creator_name, difficulty, duration_minutes, description, video_url, video_url_cos, video_url_r2, tags, published_at, is_trial')
+    .select('id, title, creator_name, difficulty, duration_minutes, description, video_url, video_url_cos, tags, published_at, is_trial')
     .eq('id', id)
     .eq('is_deleted', false);
 
@@ -28,19 +26,14 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
 
   const { data: videoData, error } = await videoQuery.single();
 
-  // 如果视频不存在，显示404页面
+  // 如果视频不存在，显示 404 页面
   if (error || !videoData) {
     notFound();
   }
 
-  // 格式化视频数据
-  // 确保视频 URL 使用 HTTPS 协议，避免混合内容错误
-  const prefer = isMainlandChina(await headers()) ? 'cos' : 'r2';
   const videoUrl = selectStorageUrl({
-    prefer,
     primaryUrl: videoData.video_url,
     cosUrl: videoData.video_url_cos,
-    r2Url: videoData.video_url_r2,
   }) || videoData.video_url;
 
   const video = {
@@ -58,7 +51,6 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
       day: 'numeric',
     }),
   };
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
@@ -91,7 +83,7 @@ export default async function VideoDetailPage({ params }: { params: Promise<{ id
         {/* 视频播放器和字幕面板 */}
         <VideoWithSubtitles videoUrl={video.videoUrl} initialSubtitles={[]} />
 
-        {/* 视频介绍：仅桌面端显示（移动端不展示此卡片） */}
+        {/* 视频介绍：仅桌面端显示（移动端不显示该卡片） */}
         <div className="hidden lg:block mt-6">
           <VideoInfo video={{ ...video, id: videoData.id }} />
         </div>

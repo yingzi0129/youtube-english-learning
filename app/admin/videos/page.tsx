@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -16,12 +16,10 @@ interface Video {
   duration_minutes: number;
   is_deleted: boolean;
   published_at: string;
-  primary_storage?: 'r2' | 'cos' | null;
+  primary_storage?: 'cos' | null;
   storage_sync_status?: 'pending' | 'synced' | 'failed' | null;
   storage_sync_error?: string | null;
-  video_url_r2?: string | null;
   video_url_cos?: string | null;
-  thumbnail_url_r2?: string | null;
   thumbnail_url_cos?: string | null;
 }
 
@@ -67,20 +65,20 @@ export default function VideosManagementPage() {
       });
       const result = await response.json();
       if (!response.ok) {
-        throw new Error(result?.error || '补齐失败');
+        throw new Error(result?.error || '琛ラ綈澶辫触');
       }
       if (videoId) {
-        const message = '已触发补齐任务';
+        const message = '宸茶Е鍙戣ˉ榻愪换鍔?;
         setBackfillMessage(message);
         showToast('success', message);
       } else {
-        const message = `处理 ${result.processed} 条，成功 ${result.successCount} 条，失败 ${result.failedCount} 条`;
+        const message = `澶勭悊 ${result.processed} 鏉★紝鎴愬姛 ${result.successCount} 鏉★紝澶辫触 ${result.failedCount} 鏉;
         setBackfillMessage(message);
         showToast('success', message);
       }
       await fetchVideos();
     } catch (err: any) {
-      const message = err.message || '补齐失败';
+      const message = err.message || '琛ラ綈澶辫触';
       setBackfillMessage(message);
       showToast('error', message);
     } finally {
@@ -89,9 +87,9 @@ export default function VideosManagementPage() {
   };
 
   const needsCosBackfill = (video: Video) => {
-    const needVideo = !video.video_url_cos && (video.video_url_r2 || video.video_url);
-    const needThumb = !video.thumbnail_url_cos && (video.thumbnail_url_r2 || video.thumbnail_url);
-    return needVideo || needThumb;
+    const needVideo = !video.video_url_cos && video.video_url;
+    const needThumb = !video.thumbnail_url_cos && video.thumbnail_url;
+    return Boolean(needVideo || needThumb);
   };
 
   const testMainlandRoute = async () => {
@@ -104,11 +102,11 @@ export default function VideosManagementPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data?.error || '测试失败');
+        throw new Error(data?.error || '娴嬭瘯澶辫触');
       }
       const first = (data?.videos || []).find((item: any) => item?.videoUrl) || null;
       if (!first?.videoUrl) {
-        showToast('info', '没有可测试的视频地址');
+        showToast('info', '娌℃湁鍙祴璇曠殑瑙嗛鍦板潃');
         return;
       }
       const host = (() => {
@@ -119,23 +117,23 @@ export default function VideosManagementPage() {
         }
       })();
       if (host.includes('myqcloud.com') || host.includes('cos.')) {
-        showToast('success', `大陆请求走 COS：${host}`);
+        showToast('success', `澶ч檰璇锋眰璧?COS锛?{host}`);
       } else {
-        showToast('error', `大陆请求未走 COS：${host || '未知地址'}`);
+        showToast('error', `澶ч檰璇锋眰鏈蛋 COS锛?{host || '鏈煡鍦板潃'}`);
       }
     } catch (err: any) {
-      showToast('error', err?.message || '测试失败');
+      showToast('error', err?.message || '娴嬭瘯澶辫触');
     } finally {
       setTestingMainland(false);
     }
   };
 
   const handleDelete = async (video: Video) => {
-    const confirmed = window.confirm(`确定要彻底删除“${video.title}”？此操作不可恢复。`);
+    const confirmed = window.confirm(`纭畾瑕佸交搴曞垹闄も€?{video.title}鈥濓紵姝ゆ搷浣滀笉鍙仮澶嶃€俙);
     if (!confirmed) return;
-    const input = window.prompt('请输入 DELETE 以确认彻底删除');
+    const input = window.prompt('璇疯緭鍏?DELETE 浠ョ‘璁ゅ交搴曞垹闄?);
     if (input !== 'DELETE') {
-      showToast('error', '已取消：未输入 DELETE');
+      showToast('error', '宸插彇娑堬細鏈緭鍏?DELETE');
       return;
     }
 
@@ -148,12 +146,12 @@ export default function VideosManagementPage() {
       });
       const result = await response.json();
       if (!response.ok) {
-        throw new Error(result?.error || '删除失败');
+        throw new Error(result?.error || '鍒犻櫎澶辫触');
       }
-      showToast('success', '删除成功');
+      showToast('success', '鍒犻櫎鎴愬姛');
       await fetchVideos();
     } catch (err: any) {
-      const message = err?.message || '删除失败';
+      const message = err?.message || '鍒犻櫎澶辫触';
       showToast('error', message);
     } finally {
       setDeletingId(null);
@@ -189,11 +187,11 @@ export default function VideosManagementPage() {
 
   return (
     <div className="space-y-6">
-      {/* 页面标题和操作 */}
+      {/* 椤甸潰鏍囬鍜屾搷浣?*/}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">视频管理</h1>
-          <p className="mt-2 text-gray-600">管理所有学习视频</p>
+          <h1 className="text-3xl font-bold text-gray-900">瑙嗛绠＄悊</h1>
+          <p className="mt-2 text-gray-600">绠＄悊鎵€鏈夊涔犺棰?/p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -202,7 +200,7 @@ export default function VideosManagementPage() {
             disabled={backfillLoading}
             className="px-4 py-2 rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 disabled:opacity-60"
           >
-            {backfillLoading ? '补齐中...' : '一键补齐COS'}
+            {backfillLoading ? '琛ラ綈涓?..' : '涓€閿ˉ榻怌OS'}
           </button>
           <button
             type="button"
@@ -210,7 +208,7 @@ export default function VideosManagementPage() {
             disabled={testingMainland}
             className="px-4 py-2 rounded-lg border border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-60"
           >
-            {testingMainland ? '测试中...' : '测试大陆走COS'}
+            {testingMainland ? '娴嬭瘯涓?..' : '娴嬭瘯澶ч檰璧癈OS'}
           </button>
           <Link
             href="/admin/videos/new"
@@ -219,7 +217,7 @@ export default function VideosManagementPage() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            添加视频
+            娣诲姞瑙嗛
           </Link>
         </div>
       </div>
@@ -230,14 +228,14 @@ export default function VideosManagementPage() {
         </div>
       )}
 
-      {/* 错误提示 */}
+      {/* 閿欒鎻愮ず */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">加载视频失败: {error}</p>
+          <p className="text-red-800">鍔犺浇瑙嗛澶辫触: {error}</p>
         </div>
       )}
 
-      {/* 视频列表 */}
+      {/* 瑙嗛鍒楄〃 */}
       {!error && videos.length === 0 && (
         <div className="bg-white rounded-xl p-12 text-center border border-gray-200">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -245,8 +243,8 @@ export default function VideosManagementPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">暂无视频</h3>
-          <p className="text-gray-600 mb-4">开始添加您的第一个学习视频</p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">鏆傛棤瑙嗛</h3>
+          <p className="text-gray-600 mb-4">寮€濮嬫坊鍔犳偍鐨勭涓€涓涔犺棰?/p>
           <Link
             href="/admin/videos/new"
             className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
@@ -254,12 +252,12 @@ export default function VideosManagementPage() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            添加视频
+            娣诲姞瑙嗛
           </Link>
         </div>
       )}
 
-      {/* 视频表格 */}
+      {/* 瑙嗛琛ㄦ牸 */}
       {!error && videos.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
@@ -267,31 +265,28 @@ export default function VideosManagementPage() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    视频信息
+                    瑙嗛淇℃伅
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    博主
+                    鍗氫富
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    难度
+                    闅惧害
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    时长
+                    鏃堕暱
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    状态
-                  </th>
+                    鐘舵€?                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    主存储
-                  </th>
+                    涓诲瓨鍌?                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    同步状态
-                  </th>
+                    鍚屾鐘舵€?                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    发布日期
+                    鍙戝竷鏃ユ湡
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    操作
+                    鎿嶄綔
                   </th>
                 </tr>
               </thead>
@@ -316,25 +311,25 @@ export default function VideosManagementPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                        video.difficulty === '初级' ? 'bg-green-100 text-green-800' :
-                        video.difficulty === '中级' ? 'bg-yellow-100 text-yellow-800' :
+                        video.difficulty === '鍒濈骇' ? 'bg-green-100 text-green-800' :
+                        video.difficulty === '涓骇' ? 'bg-yellow-100 text-yellow-800' :
                         'bg-red-100 text-red-800'
                       }`}>
                         {video.difficulty}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {video.duration_minutes}分钟
+                      {video.duration_minutes}鍒嗛挓
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                         video.is_deleted ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800'
                       }`}>
-                        {video.is_deleted ? '已删除' : '正常'}
+                        {video.is_deleted ? '宸插垹闄? : '姝ｅ父'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {video.primary_storage === 'cos' ? 'COS（国内）' : video.primary_storage === 'r2' ? 'R2（海外）' : '未知'}
+                      {video.primary_storage === 'cos' ? 'COS' : '未知'}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
@@ -345,10 +340,10 @@ export default function VideosManagementPage() {
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
                         {video.storage_sync_status === 'synced'
-                          ? '已双存'
+                          ? '宸插弻瀛?
                           : video.storage_sync_status === 'failed'
-                          ? '同步失败'
-                          : '同步中'}
+                          ? '鍚屾澶辫触'
+                          : '鍚屾涓?}
                       </span>
                       {video.storage_sync_status === 'failed' && video.storage_sync_error && (
                         <p className="text-xs text-red-600 mt-1 line-clamp-2">
@@ -367,20 +362,20 @@ export default function VideosManagementPage() {
                             onClick={() => backfillCos(video.id)}
                             className="text-purple-600 hover:text-purple-900"
                           >
-                            补齐COS
+                            琛ラ綈COS
                           </button>
                         )}
                         <Link
                           href={`/admin/videos/${video.id}/edit`}
                           className="text-purple-600 hover:text-purple-900"
                         >
-                          编辑
+                          缂栬緫
                         </Link>
                         <Link
                           href={`/admin/subtitles?video_id=${video.id}`}
                           className="text-blue-600 hover:text-blue-900"
                         >
-                          字幕
+                          瀛楀箷
                         </Link>
                         <button
                           type="button"
@@ -388,14 +383,14 @@ export default function VideosManagementPage() {
                           disabled={deletingId === video.id}
                           className="text-red-600 hover:text-red-800 disabled:opacity-60"
                         >
-                          {deletingId === video.id ? '删除中...' : '删除'}
+                          {deletingId === video.id ? '鍒犻櫎涓?..' : '鍒犻櫎'}
                         </button>
                         <Link
                           href={`/videos/${video.id}`}
                           target="_blank"
                           className="text-gray-600 hover:text-gray-900"
                         >
-                          预览
+                          棰勮
                         </Link>
                       </div>
                     </td>

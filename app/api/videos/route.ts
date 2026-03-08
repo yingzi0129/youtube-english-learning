@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isTrialUser } from '@/lib/auth/trial';
-import { isMainlandChina } from '@/lib/region';
 import { selectStorageUrl } from '@/lib/storage-urls';
 
 type VideoRow = {
@@ -10,7 +9,6 @@ type VideoRow = {
   description?: string | null;
   thumbnail_url?: string | null;
   thumbnail_url_cos?: string | null;
-  thumbnail_url_r2?: string | null;
   duration_minutes?: number | null;
   creator_name?: string | null;
   tags?: string[] | null;
@@ -18,7 +16,6 @@ type VideoRow = {
   published_at?: string | null;
   video_url?: string | null;
   video_url_cos?: string | null;
-  video_url_r2?: string | null;
 };
 
 const toVideoRows = (data: unknown): VideoRow[] => {
@@ -47,7 +44,6 @@ export async function GET(request: NextRequest) {
           'description',
           'thumbnail_url',
           'thumbnail_url_cos',
-          'thumbnail_url_r2',
           'duration_minutes',
           'creator_name',
           'tags',
@@ -61,7 +57,6 @@ export async function GET(request: NextRequest) {
         'description',
         'thumbnail_url',
         'thumbnail_url_cos',
-        'thumbnail_url_r2',
         'duration_minutes',
         'creator_name',
         'tags',
@@ -69,7 +64,6 @@ export async function GET(request: NextRequest) {
         'published_at',
         'video_url',
         'video_url_cos',
-        'video_url_r2',
       ].join(', ');
     })();
 
@@ -109,16 +103,11 @@ export async function GET(request: NextRequest) {
       response.headers.set('Vary', 'Cookie');
       return response;
     }
-
-    const prefer = isMainlandChina(request.headers) ? 'cos' : 'r2';
-
     // 格式化视频数据，确保返回格式一致
     const formattedVideos = rows.map((video) => {
       const thumbnailUrl = selectStorageUrl({
-        prefer,
         primaryUrl: video.thumbnail_url || undefined,
         cosUrl: video.thumbnail_url_cos || undefined,
-        r2Url: video.thumbnail_url_r2 || undefined,
       });
 
       const base = {
@@ -143,10 +132,8 @@ export async function GET(request: NextRequest) {
       }
 
       const videoUrl = selectStorageUrl({
-        prefer,
         primaryUrl: video.video_url || undefined,
         cosUrl: video.video_url_cos || undefined,
-        r2Url: video.video_url_r2 || undefined,
       });
 
       return {

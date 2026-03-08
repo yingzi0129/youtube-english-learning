@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -9,7 +9,7 @@ import { updateWatchProgress, getWatchProgress } from '@/lib/watchProgress';
 
 type Subtitle = {
   id: number;
-  dbId?: string; // 数据库 UUID，用于收藏功能
+  dbId?: string; // 数据库字幕 ID（UUID），用于收藏功能
   startTime: number;
   endTime: number;
   text: string;
@@ -26,7 +26,6 @@ type Subtitle = {
     helperSentence?: string;
   }>;
 };
-
 interface VideoWithSubtitlesProps {
   videoUrl: string;
   initialSubtitles?: Subtitle[];
@@ -228,12 +227,12 @@ export default function VideoWithSubtitles({ videoUrl, initialSubtitles = [] }: 
   const videoPlayerRef = useRef<VideoPlayerRef | null>(null);
   const [mobileStickyTop, setMobileStickyTop] = useState<number>(0);
 
-  // Mobile: keep the sticky video right below the page header (no gap where subtitles can slide into).
+  // 移动端：让视频贴在页面头部下方，避免字幕顶上来
   useEffect(() => {
     const header = document.querySelector<HTMLElement>('[data-video-page-header="true"]');
     if (!header) return;
 
-    // Use offsetHeight (integer) to avoid 0.5px oscillation on mobile Safari during scroll/URL-bar resize.
+    // 使用 offsetHeight（整数）避免移动端 Safari 滚动/地址栏变化时抖动
     const update = () => {
       const h = header.offsetHeight || 0;
       setMobileStickyTop((prev) => {
@@ -244,7 +243,7 @@ export default function VideoWithSubtitles({ videoUrl, initialSubtitles = [] }: 
 
     update();
 
-    // Prefer observing the header itself (instead of window resize) to avoid jitter during scroll.
+    // 优先监听 header 自身尺寸变化，避免滚动时抖动
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined') {
       ro = new ResizeObserver(() => update());
@@ -253,7 +252,7 @@ export default function VideoWithSubtitles({ videoUrl, initialSubtitles = [] }: 
       window.addEventListener('resize', update);
     }
 
-    // Orientation change can affect layout without reliably triggering ResizeObserver in some browsers.
+    // 部分浏览器横竖屏切换不会触发 ResizeObserver，需要手动监听
     window.addEventListener('orientationchange', update);
 
     return () => {
@@ -468,7 +467,7 @@ export default function VideoWithSubtitles({ videoUrl, initialSubtitles = [] }: 
           duration,
         });
 
-        // 尝试使用 sendBeacon，如果不支持则同步保存
+        // 尝试使用 sendBeacon，如不支持则同步保存
         if (navigator.sendBeacon) {
           const blob = new Blob([data], { type: 'application/json' });
           navigator.sendBeacon('/api/save-progress', blob);
@@ -495,16 +494,16 @@ export default function VideoWithSubtitles({ videoUrl, initialSubtitles = [] }: 
     setAutoPlayOnSeek(autoPlay);
     // 跳转时保存进度
     saveProgress();
-    // 重置 seekToTime，以便下次点击同一字幕时也能触发跳转
+    // 重置 seekToTime，以便下次点击同一字幕也能触发跳转
     setTimeout(() => {
       setSeekToTime(undefined);
       setAutoPlayOnSeek(false);
     }, 100);
   };
 
-  // Compute a seek target for a subtitle click.
-  // Goal: match "sentence starts" even when exported subtitle start_time is slightly late,
-  // while avoiding pulling audio from the previous subtitle when there's no gap.
+  // 计算字幕点击时的跳转目标时间
+  // 目标：即使字幕 start_time 略晚，也尽量对齐句子起点
+  // 同时避免在没有空隙时拉到上一句的音频
   const getSmartSeekTimeForSubtitle = (subtitleId: number) => {
     const index = subtitles.findIndex((s) => s.id === subtitleId);
     if (index === -1) return 0;
@@ -514,13 +513,13 @@ export default function VideoWithSubtitles({ videoUrl, initialSubtitles = [] }: 
 
     const manualOffset = Number.isFinite(Number(sub.seekOffset)) ? Number(sub.seekOffset) : 0;
 
-    // Small padding to avoid landing exactly on boundaries.
+    // 小幅偏移，避免落在边界上
     const boundaryPad = 0.03;
 
-    // Default tiny backtrack to counter slight lateness / keyframe snapping.
+    // 默认轻微回退，用于抵消字幕略晚或关键帧吸附
     const baseBack = 0.12;
 
-    // If there's a real gap, we can safely backtrack more (up to 1s) into the gap.
+    // 若存在空隙，可在空隙内适当回退（最多 1 秒）
     const gapBackThreshold = 0.35;
     const maxAutoBack = 1.0;
 
@@ -535,21 +534,21 @@ export default function VideoWithSubtitles({ videoUrl, initialSubtitles = [] }: 
         if (gap >= gapBackThreshold) {
           back = Math.min(maxAutoBack, Math.max(0, gap - boundaryPad));
         } else {
-          // Only backtrack within the gap (if any), otherwise don't auto-backtrack.
+          // 仅在空隙内回退，否则不自动回退
           back = Math.min(back, Math.max(0, gap - boundaryPad));
         }
       }
       target = sub.startTime - back;
     }
 
-    // Don't seek before the previous subtitle ends unless user explicitly overrides via seekOffset.
+    // 除非用户设置 seekOffset，否则不要回退到上一句结束之前
     if (manualOffset === 0 && prev) {
       target = Math.max(target, prev.endTime + boundaryPad);
     }
 
-    // Clamp to valid time range.
+    // 限制在有效时间范围内
     target = Math.max(0, target);
-    // Avoid seeking beyond the subtitle end (very short subtitles).
+    // 避免跳转超过字幕结束（短字幕）
     if (sub.endTime > sub.startTime) {
       target = Math.min(target, Math.max(0, sub.endTime - boundaryPad));
     }
@@ -557,13 +556,13 @@ export default function VideoWithSubtitles({ videoUrl, initialSubtitles = [] }: 
     return target;
   };
 
-  // Subtitle click: seek without forcing autoplay (video keeps current play/pause state).
+  // 点击字幕：只跳转，不强制播放（保持原播放状态）
   const handleSeekToSubtitle = (subtitleId: number) => {
     const time = getSmartSeekTimeForSubtitle(subtitleId);
     handleSeek(time, false);
   };
 
-  // Play original: seek and force autoplay.
+  // 播放原声：跳转并强制播放
   const handlePlayOriginal = (subtitleId: number) => {
     const time = getSmartSeekTimeForSubtitle(subtitleId);
     handleSeek(time, true);

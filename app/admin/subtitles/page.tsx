@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -76,7 +76,7 @@ export default function SubtitlesManagementPage() {
 
       setVideos(data || []);
     } catch (err) {
-      console.error('获取视频列表失败:', err);
+      console.error('鑾峰彇瑙嗛鍒楄〃澶辫触:', err);
     }
   };
 
@@ -85,7 +85,7 @@ export default function SubtitlesManagementPage() {
     try {
       const supabase = createClient();
 
-      // 获取视频信息
+      // 鑾峰彇瑙嗛淇℃伅
       const { data: videoData } = await supabase
         .from('videos')
         .select('*')
@@ -94,7 +94,7 @@ export default function SubtitlesManagementPage() {
 
       setSelectedVideo(videoData);
 
-      // 获取字幕
+      // 鑾峰彇瀛楀箷
       const { data: subtitlesData } = await supabase
         .from('subtitles')
         .select('*')
@@ -114,7 +114,7 @@ export default function SubtitlesManagementPage() {
         }))
       );
     } catch (err) {
-      console.error('获取数据失败:', err);
+      console.error('鑾峰彇鏁版嵁澶辫触:', err);
     } finally {
       setLoading(false);
     }
@@ -168,8 +168,8 @@ export default function SubtitlesManagementPage() {
         )
       );
     } catch (err: any) {
-      console.error('保存点击偏移失败:', err);
-      showToast('error', err?.message || '保存失败，请重试');
+      console.error('淇濆瓨鐐瑰嚮鍋忕Щ澶辫触:', err);
+      showToast('error', err?.message || '淇濆瓨澶辫触锛岃閲嶈瘯');
     } finally {
       setSavingSubtitleId(null);
     }
@@ -189,7 +189,7 @@ export default function SubtitlesManagementPage() {
     setPlayError('');
     const video = videoRef.current;
     if (!video) {
-      setPlayError('试听失败：未找到视频资源，请确认该视频存在 video_url。');
+      setPlayError('璇曞惉澶辫触锛氭湭鎵惧埌瑙嗛璧勬簮锛岃纭璇ヨ棰戝瓨鍦?video_url銆?);
       return;
     }
 
@@ -234,8 +234,8 @@ export default function SubtitlesManagementPage() {
         videoRef.current.pause();
       }, Math.max(300, (stopAt - target) * 1000));
     } catch (err: any) {
-      console.error('试听失败:', err);
-      setPlayError('试听失败：请检查视频是否可访问（R2 跨域/范围请求）或浏览器是否阻止播放。');
+      console.error('璇曞惉澶辫触:', err);
+      setPlayError('璇曞惉澶辫触锛氳妫€鏌ヨ棰戞槸鍚﹀彲璁块棶锛圧2 璺ㄥ煙/鑼冨洿璇锋眰锛夋垨娴忚鍣ㄦ槸鍚﹂樆姝㈡挱鏀俱€?);
     }
   };
 
@@ -261,23 +261,23 @@ export default function SubtitlesManagementPage() {
 
   return (
     <div className="space-y-6">
-      {/* 页面标题 */}
+      {/* 椤甸潰鏍囬 */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">字幕管理</h1>
-        <p className="mt-2 text-gray-600">管理视频字幕</p>
+        <h1 className="text-3xl font-bold text-gray-900">瀛楀箷绠＄悊</h1>
+        <p className="mt-2 text-gray-600">绠＄悊瑙嗛瀛楀箷</p>
       </div>
 
-      {/* 视频选择 */}
+      {/* 瑙嗛閫夋嫨 */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          选择视频
+          閫夋嫨瑙嗛
         </label>
         <select
           value={videoId || ''}
           onChange={(e) => handleVideoChange(e.target.value)}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         >
-          <option value="">请选择视频</option>
+          <option value="">璇烽€夋嫨瑙嗛</option>
           {videos.map((video) => (
             <option key={video.id} value={video.id}>
               {video.title}
@@ -286,16 +286,16 @@ export default function SubtitlesManagementPage() {
         </select>
       </div>
 
-      {/* 字幕列表 */}
+      {/* 瀛楀箷鍒楄〃 */}
       {selectedVideo && (
         <div className="space-y-4">
-          {/* 视频信息和操作 */}
+          {/* 瑙嗛淇℃伅鍜屾搷浣?*/}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">{selectedVideo.title}</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  {subtitles.length} 条字幕
+                  {subtitles.length} 鏉″瓧骞?
                 </p>
               </div>
               <Link
@@ -305,7 +305,7 @@ export default function SubtitlesManagementPage() {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                上传字幕
+                涓婁紶瀛楀箷
               </Link>
             </div>
 
@@ -331,7 +331,7 @@ export default function SubtitlesManagementPage() {
             )}
           </div>
 
-          {/* 字幕表格 */}
+          {/* 瀛楀箷琛ㄦ牸 */}
           {subtitles.length > 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
@@ -339,25 +339,25 @@ export default function SubtitlesManagementPage() {
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        序号
+                        搴忓彿
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        时间范围
+                        鏃堕棿鑼冨洿
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        点击偏移
+                        鐐瑰嚮鍋忕Щ
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        是否可用
+                        鏄惁鍙敤
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        英文字幕
+                        鑻辨枃瀛楀箷
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        中文字幕
+                        涓枃瀛楀箷
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        操作
+                        鎿嶄綔
                       </th>
                     </tr>
                   </thead>
@@ -376,11 +376,11 @@ export default function SubtitlesManagementPage() {
                         <td className="px-6 py-4 text-sm">
                           {isSeekOffsetConfirmed(subtitle) ? (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              已确认
+                              宸茬‘璁?
                             </span>
                           ) : (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-50 text-gray-600 border border-gray-200">
-                              未确认
+                              鏈‘璁?
                             </span>
                           )}
                         </td>
@@ -396,16 +396,16 @@ export default function SubtitlesManagementPage() {
                               type="button"
                               onClick={() => handleAudition(subtitle)}
                               className="px-3 py-1.5 text-xs rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-800"
-                              title="试听该句（按当前偏移播放）"
+                              title="璇曞惉璇ュ彞锛堟寜褰撳墠鍋忕Щ鎾斁锛?
                             >
-                              试听
+                              璇曞惉
                             </button>
 
                             <button
                               type="button"
                               onClick={() => updateSeekOffsetLocal(subtitle.id, (subtitle.seek_offset ?? 0) - 0.1)}
                               className="px-2.5 py-1.5 text-xs rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-800"
-                              title="提前 0.1 秒"
+                              title="鎻愬墠 0.1 绉?
                             >
                               -0.1s
                             </button>
@@ -413,7 +413,7 @@ export default function SubtitlesManagementPage() {
                               type="button"
                               onClick={() => updateSeekOffsetLocal(subtitle.id, (subtitle.seek_offset ?? 0) + 0.1)}
                               className="px-2.5 py-1.5 text-xs rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-800"
-                              title="延后 0.1 秒"
+                              title="寤跺悗 0.1 绉?
                             >
                               +0.1s
                             </button>
@@ -422,7 +422,7 @@ export default function SubtitlesManagementPage() {
                               type="button"
                               onClick={() => updateSeekOffsetLocal(subtitle.id, -0.5)}
                               className="px-2.5 py-1.5 text-xs rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-800"
-                              title="常用预设：回退 0.5 秒"
+                              title="甯哥敤棰勮锛氬洖閫€ 0.5 绉?
                             >
                               -0.5s
                             </button>
@@ -430,7 +430,7 @@ export default function SubtitlesManagementPage() {
                               type="button"
                               onClick={() => updateSeekOffsetLocal(subtitle.id, -1.0)}
                               className="px-2.5 py-1.5 text-xs rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-800"
-                              title="常用预设：回退 1.0 秒"
+                              title="甯哥敤棰勮锛氬洖閫€ 1.0 绉?
                             >
                               -1.0s
                             </button>
@@ -438,9 +438,9 @@ export default function SubtitlesManagementPage() {
                               type="button"
                               onClick={() => updateSeekOffsetLocal(subtitle.id, 0)}
                               className="px-2.5 py-1.5 text-xs rounded-lg bg-white border border-gray-300 hover:bg-gray-50 text-gray-800"
-                              title="重置为 0"
+                              title="閲嶇疆涓?0"
                             >
-                              重置
+                              閲嶇疆
                             </button>
 
                             <button
@@ -448,17 +448,17 @@ export default function SubtitlesManagementPage() {
                               onClick={() => handleSaveSeekOffset(subtitle.id)}
                               className="px-3 py-1.5 text-xs rounded-lg bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50"
                               disabled={savingSubtitleId === subtitle.id}
-                              title="保存该句点击偏移"
+                              title="淇濆瓨璇ュ彞鐐瑰嚮鍋忕Щ"
                             >
-                              {savingSubtitleId === subtitle.id ? '保存中…' : '保存'}
+                              {savingSubtitleId === subtitle.id ? '淇濆瓨涓€? : '淇濆瓨'}
                             </button>
 
                             <Link
                               href={`/admin/subtitles/${subtitle.id}/edit`}
                               className="px-3 py-1.5 text-xs rounded-lg text-purple-700 border border-purple-200 bg-purple-50 hover:bg-purple-100"
-                              title="进入详情页编辑"
+                              title="杩涘叆璇︽儏椤电紪杈?
                             >
-                              详情
+                              璇︽儏
                             </Link>
                           </div>
                         </td>
@@ -475,8 +475,8 @@ export default function SubtitlesManagementPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">暂无字幕</h3>
-              <p className="text-gray-600 mb-4">为这个视频上传字幕文件</p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">鏆傛棤瀛楀箷</h3>
+              <p className="text-gray-600 mb-4">涓鸿繖涓棰戜笂浼犲瓧骞曟枃浠?/p>
               <Link
                 href={`/admin/subtitles/upload?video_id=${videoId}`}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
@@ -484,14 +484,14 @@ export default function SubtitlesManagementPage() {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                上传字幕
+                涓婁紶瀛楀箷
               </Link>
             </div>
           )}
         </div>
       )}
 
-      {/* 未选择视频提示 */}
+      {/* 鏈€夋嫨瑙嗛鎻愮ず */}
       {!selectedVideo && !loading && (
         <div className="bg-white rounded-xl p-12 text-center border border-gray-200">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -499,8 +499,8 @@ export default function SubtitlesManagementPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">请选择视频</h3>
-          <p className="text-gray-600">从上方下拉菜单中选择一个视频来管理其字幕</p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">璇烽€夋嫨瑙嗛</h3>
+          <p className="text-gray-600">浠庝笂鏂逛笅鎷夎彍鍗曚腑閫夋嫨涓€涓棰戞潵绠＄悊鍏跺瓧骞?/p>
         </div>
       )}
     </div>

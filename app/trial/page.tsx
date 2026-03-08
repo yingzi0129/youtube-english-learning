@@ -1,10 +1,8 @@
-import HomeClient from '../HomeClient';
+﻿import HomeClient from '../HomeClient';
 import { createClient } from '@/lib/supabase/server';
 import { getUserRole } from '@/lib/auth/permissions';
 import { getTrialContext } from '@/lib/auth/trial';
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
-import { isMainlandChina } from '@/lib/region';
 import { selectStorageUrl } from '@/lib/storage-urls';
 
 export default async function TrialPage() {
@@ -36,23 +34,20 @@ export default async function TrialPage() {
     .eq('is_trial', true)
     .order('published_at', { ascending: false });
 
-  const prefer = isMainlandChina(await headers()) ? 'cos' : 'r2';
 
   const videos = videosData?.map((video) => ({
     id: video.id,
     title: video.title,
     description: video.description,
     thumbnail: selectStorageUrl({
-      prefer,
       primaryUrl: video.thumbnail_url,
       cosUrl: video.thumbnail_url_cos,
-      r2Url: video.thumbnail_url_r2,
     }) || video.thumbnail_url,
-    duration: `${video.duration_minutes}分钟`,
+    duration: `${video.duration_minutes}鍒嗛挓`,
     duration_minutes: video.duration_minutes,
     creator: video.creator_name,
     tags: video.tags || [],
-    difficulty: video.difficulty as '初级' | '中级' | '高级',
+    difficulty: video.difficulty as '鍒濈骇' | '涓骇' | '楂樼骇',
     date: new Date(video.published_at).toLocaleDateString('zh-CN', {
       year: 'numeric',
       month: 'numeric',
@@ -65,7 +60,7 @@ export default async function TrialPage() {
       isAdmin={isAdmin}
       videos={videos}
       error={error}
-      userLabel="试用用户"
+      userLabel="璇曠敤鐢ㄦ埛"
       notice={notice}
     />
   );

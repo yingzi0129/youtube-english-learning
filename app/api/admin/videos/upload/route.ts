@@ -2,17 +2,13 @@
 import { randomUUID } from 'crypto';
 import { isAdmin } from '@/lib/auth/permissions';
 import { createAdminClient } from '@/lib/supabase/server';
-import { uploadToR2 } from '@/lib/r2';
 import { uploadToCos } from '@/lib/cos';
 
 export const runtime = 'nodejs';
 
-type StorageProvider = 'r2' | 'cos';
+type StorageProvider = 'cos';
 
-const MAX_RETRIES = Math.max(0, Number(process.env.VIDEO_SYNC_MAX_RETRIES ?? '2') || 0);
 const CACHE_CONTROL = 'public, max-age=31536000';
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const sanitizeExt = (value: string) => value.replace(/[^a-z0-9]/gi, '').toLowerCase();
 
@@ -44,30 +40,13 @@ const parseList = (value: FormDataEntryValue | null) => {
     .filter(Boolean);
 };
 
-const uploadWithRetry = async (fn: () => Promise<string>, retries: number) => {
-  let attempt = 0;
-  while (true) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (attempt >= retries) throw error;
-      attempt += 1;
-      await sleep(500 * attempt);
-    }
-  }
-};
 
 const uploadToStorage = (
-  provider: StorageProvider,
   key: string,
   buffer: Buffer,
   contentType: string,
   cacheControl?: string
-) => {
-  return provider === 'r2'
-    ? uploadToR2(key, buffer, contentType, { cacheControl })
-    : uploadToCos(key, buffer, contentType, { cacheControl });
-};
+) => uploadToCos(key, buffer, contentType, { cacheControl });
 
 export async function POST(request: NextRequest) {
   try {
@@ -79,8 +58,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const videoFile = formData.get('video') as File;
     const thumbnailFile = formData.get('thumbnail') as File | null;
-    const primaryStorageRaw = String(formData.get('primaryStorage') || '').toLowerCase();
-    const primaryStorage = (primaryStorageRaw === 'cos' ? 'cos' : 'r2') as StorageProvider;
+    const primaryStorage: StorageProvider = 'cos';
 
     const title = String(formData.get('title') || '').trim();
     const description = String(formData.get('description') || '').trim();
@@ -140,10 +118,8 @@ export async function POST(request: NextRequest) {
         topics,
         video_url: primaryVideoUrl,
         thumbnail_url: primaryThumbnailUrl,
-        video_url_r2: primaryStorage === 'r2' ? primaryVideoUrl : null,
-        video_url_cos: primaryStorage === 'cos' ? primaryVideoUrl : null,
-        thumbnail_url_r2: primaryStorage === 'r2' ? primaryThumbnailUrl : null,
-        thumbnail_url_cos: primaryStorage === 'cos' ? primaryThumbnailUrl : null,
+        video_url_cos: primaryVideoUrl,
+        thumbnail_url_cos: primaryThumbnailUrl,
         primary_storage: primaryStorage,
         storage_sync_status: 'pending',
         storage_sync_error: null,
@@ -159,60 +135,14 @@ export async function POST(request: NextRequest) {
     }
 
     const videoId = inserted.id;
-    const secondaryStorage: StorageProvider = primaryStorage === 'r2' ? 'cos' : 'r2';
-
-    const uploadSecondary = async () => {
-      try {
-        const updates: Record<string, any> = {
-          storage_sync_status: 'synced',
-          storage_sync_error: null,
-          storage_sync_updated_at: new Date().toISOString(),
-        };
-
-        const secondaryVideoUrl = await uploadWithRetry(
-          () => uploadToStorage(secondaryStorage, videoKey, videoBuffer, videoContentType, CACHE_CONTROL),
-          MAX_RETRIES
-        );
-
-        if (secondaryStorage === 'r2') {
-          updates.video_url_r2 = secondaryVideoUrl;
-        } else {
-          updates.video_url_cos = secondaryVideoUrl;
-        }
-
-        if (thumbnailBuffer && thumbnailKey) {
-          const secondaryThumbnailUrl = await uploadWithRetry(
-            () =>
-              uploadToStorage(
-                secondaryStorage,
-                thumbnailKey,
-                thumbnailBuffer,
-                thumbnailContentType,
-                CACHE_CONTROL
-              ),
-            MAX_RETRIES
-          );
-          if (secondaryStorage === 'r2') {
-            updates.thumbnail_url_r2 = secondaryThumbnailUrl;
-          } else {
-            updates.thumbnail_url_cos = secondaryThumbnailUrl;
-          }
-        }
-
-        await adminClient.from('videos').update(updates).eq('id', videoId);
-      } catch (error: any) {
-        await adminClient
-          .from('videos')
-          .update({
-            storage_sync_status: 'failed',
-            storage_sync_error: error?.message || 'secondary upload failed',
-            storage_sync_updated_at: new Date().toISOString(),
-          })
-          .eq('id', videoId);
-      }
-    };
-
-    void uploadSecondary();
+    await adminClient
+      .from('videos')
+      .update({
+        storage_sync_status: 'synced',
+        storage_sync_error: null,
+        storage_sync_updated_at: new Date().toISOString(),
+      })
+      .eq('id', videoId);
 
     return NextResponse.json({
       success: true,
@@ -220,7 +150,7 @@ export async function POST(request: NextRequest) {
       primaryStorage,
       primaryVideoUrl,
       primaryThumbnailUrl,
-      secondaryStatus: 'pending',
+      secondaryStatus: 'synced',
     });
   } catch (error: any) {
     console.error('视频上传失败:', error);
