@@ -43,11 +43,11 @@ export default async function TrialPage() {
       primaryUrl: video.thumbnail_url,
       cosUrl: video.thumbnail_url_cos,
     }) || video.thumbnail_url,
-    duration: `${video.duration_minutes}鍒嗛挓`,
+    duration: `${video.duration_minutes}分钟`,
     duration_minutes: video.duration_minutes,
     creator: video.creator_name,
     tags: video.tags || [],
-    difficulty: video.difficulty as '鍒濈骇' | '涓骇' | '楂樼骇',
+    difficulty: video.difficulty as '初级' | '中级' | '高级',
     date: new Date(video.published_at).toLocaleDateString('zh-CN', {
       year: 'numeric',
       month: 'numeric',
@@ -60,7 +60,7 @@ export default async function TrialPage() {
       isAdmin={isAdmin}
       videos={videos}
       error={error}
-      userLabel="璇曠敤鐢ㄦ埛"
+      userLabel="试用用户"
       notice={notice}
     />
   );

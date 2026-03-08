@@ -1169,7 +1169,7 @@ export default function SubtitlePanel({
 
             {cardPoint.meaning && (
               <div className="mt-4">
-                <div className="text-xs font-semibold text-gray-500 uppercase">閲婁箟</div>
+                <div className="text-xs font-semibold text-gray-500 uppercase">释义</div>
                 <div className="mt-1 text-base font-semibold text-gray-900 leading-relaxed break-words">
                   {cardPoint.meaning}
                 </div>
@@ -1178,7 +1178,7 @@ export default function SubtitlePanel({
 
             {cardPoint.helperSentence && (
               <div className="mt-4">
-                <div className="text-xs font-semibold text-gray-500 uppercase">鐢ㄦ硶</div>
+                <div className="text-xs font-semibold text-gray-500 uppercase">用法</div>
                 <div className="mt-2 inline-block max-w-full rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-800 break-words">
                   {cardPoint.helperSentence}
                 </div>

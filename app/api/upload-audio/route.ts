@@ -5,7 +5,7 @@ import { generateAudioPath } from '@/lib/audio-paths';
 
 export async function POST(request: NextRequest) {
   try {
-    // 楠岃瘉鐢ㄦ埛鐧诲綍
+    // 验证用户登录
     const supabase = await createClient();
     const {
       data: { user },
@@ -13,10 +13,10 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
-      return NextResponse.json({ error: '鏈櫥褰? }, { status: 401 });
+      return NextResponse.json({ error: '未登录' }, { status: 401 });
     }
 
-    // 鑾峰彇琛ㄥ崟鏁版嵁
+    // 获取表单数据
     const formData = await request.formData();
     const audioFile = formData.get('audio') as File;
     const videoId = formData.get('videoId') as string;
@@ -24,20 +24,20 @@ export async function POST(request: NextRequest) {
     const durationSeconds = formData.get('durationSeconds') as string;
 
     if (!audioFile || !videoId || !subtitleId) {
-      return NextResponse.json({ error: '缂哄皯蹇呰鍙傛暟' }, { status: 400 });
+      return NextResponse.json({ error: '缺少必要参数' }, { status: 400 });
     }
 
-    // 鐢熸垚甯︽棩鏈熺殑鏂囦欢璺緞锛堟牸寮忥細audio/2026/02/18/userId/videoId/subtitleId.webm锛?
+    // 生成带日期的文件路径（格式：audio/2026/02/18/userId/videoId/subtitleId.webm）
     const fileName = generateAudioPath(user.id, videoId, subtitleId);
 
-    // 灏嗘枃浠惰浆鎹负 Buffer
+    // 将文件转换为 Buffer
     const arrayBuffer = await audioFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     // 上传到 COS
     const publicUrl = await uploadToCos(fileName, buffer, 'audio/webm');
 
-    // 淇濆瓨鍒版暟鎹簱
+    // 保存到数据库
     const { error: dbError } = await supabase.from('speaking_practice').upsert(
       {
         user_id: user.id,
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (dbError) {
-      return NextResponse.json({ error: '淇濆瓨鍒版暟鎹簱澶辫触' }, { status: 500 });
+      return NextResponse.json({ error: '保存到数据库失败' }, { status: 500 });
     }
 
     return NextResponse.json({
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       audioUrl: publicUrl,
     });
   } catch (error) {
-    console.error('涓婁紶澶辫触:', error);
-    return NextResponse.json({ error: '涓婁紶澶辫触' }, { status: 500 });
+    console.error('上传失败:', error);
+    return NextResponse.json({ error: '上传失败' }, { status: 500 });
   }
 }

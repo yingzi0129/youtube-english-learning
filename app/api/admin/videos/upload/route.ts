@@ -89,7 +89,6 @@ export async function POST(request: NextRequest) {
     const thumbnailKey = thumbnailFile ? buildKey('thumbnails', getFileExtension(thumbnailFile)) : null;
 
     const primaryVideoUrl = await uploadToStorage(
-      primaryStorage,
       videoKey,
       videoBuffer,
       videoContentType,
@@ -97,7 +96,6 @@ export async function POST(request: NextRequest) {
     );
     const primaryThumbnailUrl = thumbnailBuffer && thumbnailKey
       ? await uploadToStorage(
-          primaryStorage,
           thumbnailKey,
           thumbnailBuffer,
           thumbnailContentType,
