@@ -183,6 +183,11 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: '添加收藏失败' }));
+        // 409 表示已经收藏过了，刷新 store 获取真实数据，不回滚
+        if (response.status === 409) {
+          await get().fetchFavorites(undefined, 'ids');
+          return optimisticFavorite as any;
+        }
         throw new Error(errorData.error || '添加收藏失败');
       }
 

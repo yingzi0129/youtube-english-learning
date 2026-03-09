@@ -53,7 +53,9 @@ export async function POST(request: NextRequest) {
     );
 
     if (dbError) {
-      return NextResponse.json({ error: '保存到数据库失败' }, { status: 500 });
+      console.error('数据库写入失败:', dbError);
+      // 数据库失败但 COS 已成功，仍返回 audioUrl 让前端可以播放
+      return NextResponse.json({ success: true, audioUrl: publicUrl, warning: '数据库保存失败' });
     }
 
     return NextResponse.json({

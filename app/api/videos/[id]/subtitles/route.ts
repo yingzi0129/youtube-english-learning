@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { isTrialUser } from '@/lib/auth/trial';
 
 export const runtime = 'nodejs';
@@ -41,7 +41,7 @@ type ApiSubtitle = {
 };
 
 const SELECT_FIELDS_FULL =
-  'id, sequence, start_time, end_time, text_en, text_zh, seek_offset, annotations, learning_points';
+  'id, sequence, start_time, end_time, text_en, text_zh, seek_offset, annotations';
 const SELECT_FIELDS_MIN =
   'id, sequence, start_time, end_time, text_en, text_zh, seek_offset';
 
@@ -167,7 +167,7 @@ export async function GET(request: NextRequest, { params }: { params: RouteParam
     const before = parseNumber(url.searchParams.get('before'), null);
     const around = parseNumber(url.searchParams.get('around'), null);
 
-    const subtitlesTable = supabase.from('subtitles');
+    const subtitlesTable = createAdminClient().from('subtitles');
 
     if (around != null) {
       const afterBuilder = (fields: string) =>

@@ -79,12 +79,12 @@ export default function VideoCard({
     >
       {/* 视频缩略图 */}
       <div className="relative aspect-video bg-gradient-to-br from-purple-400 via-pink-400 to-rose-400 flex items-center justify-center overflow-hidden">
-        {/* 收藏按钮 - 右上角，悬停或已收藏时显示 */}
+        {/* 收藏按钮 - 右上角，移动端始终显示，桌面端悬停或已收藏时显示 */}
         <div
           className={`absolute top-2 right-2 lg:top-3 lg:right-3 z-20 transition-all duration-300 ${
             isHovered || isFavorited
               ? 'opacity-100 scale-100'
-              : 'opacity-0 scale-75 pointer-events-none'
+              : 'lg:opacity-0 lg:scale-75 lg:pointer-events-none opacity-100 scale-100'
           }`}
         >
           <div

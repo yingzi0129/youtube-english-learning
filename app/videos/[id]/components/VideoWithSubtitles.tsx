@@ -216,6 +216,7 @@ export default function VideoWithSubtitles({ videoUrl, initialSubtitles = [] }: 
   const [autoNextSentence, setAutoNextSentence] = useState(true);
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState<number | null>(null);
   const sentenceLoopTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const loopJumpingRef = useRef(false); // 防止重复触发跳转
 
   // 移动端控制状态
   const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>('bilingual');
@@ -284,6 +285,7 @@ export default function VideoWithSubtitles({ videoUrl, initialSubtitles = [] }: 
     if (currentSubtitle !== -1 && currentSubtitle !== currentSentenceIndex) {
       setCurrentSentenceIndex(currentSubtitle);
       setCurrentLoopIndex(0); // 切换句子时重置循环计数
+      loopJumpingRef.current = false; // 切换句子时重置跳转锁
     }
   }, [currentTime, subtitles, currentSentenceIndex]);
 
@@ -323,6 +325,9 @@ export default function VideoWithSubtitles({ videoUrl, initialSubtitles = [] }: 
 
       // 检查是否到达句子结尾
       if (currentTime >= currentSubtitle.endTime - 0.1) {
+        if (loopJumpingRef.current) return; // 已在跳转中，忽略
+        loopJumpingRef.current = true;
+
         // 检查是否需要继续循环
         const shouldLoop = loopCount === -1 || currentLoopIndex < loopCount - 1;
 
@@ -330,16 +335,23 @@ export default function VideoWithSubtitles({ videoUrl, initialSubtitles = [] }: 
           // 继续循环当前句子
           setCurrentLoopIndex(prev => prev + 1);
           setSeekToTime(currentSubtitle.startTime);
-          setTimeout(() => setSeekToTime(undefined), 100);
+          setTimeout(() => {
+            setSeekToTime(undefined);
+            loopJumpingRef.current = false;
+          }, 300);
         } else if (autoNextSentence && currentSentenceIndex < subtitles.length - 1) {
           // 循环完成，自动播放下一句
           const nextSubtitle = subtitles[currentSentenceIndex + 1];
           setCurrentLoopIndex(0);
           setSeekToTime(nextSubtitle.startTime);
-          setTimeout(() => setSeekToTime(undefined), 100);
+          setTimeout(() => {
+            setSeekToTime(undefined);
+            loopJumpingRef.current = false;
+          }, 300);
         } else {
           // 循环完成，暂停播放
           setIsPlaying(false);
+          loopJumpingRef.current = false;
         }
       }
     }

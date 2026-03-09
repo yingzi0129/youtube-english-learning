@@ -83,6 +83,18 @@ export default function AudioRecorder({
 
   // 开始录音
   const startRecording = async () => {
+    // 检查是否在安全上下文（HTTPS 或 localhost）
+    if (!window.isSecureContext) {
+      alert('录音功能需要 HTTPS 才能使用。请联系管理员为网站配置 SSL 证书。');
+      return;
+    }
+
+    // 检查浏览器是否支持麦克风 API
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('您的浏览器不支持录音功能，请使用 Chrome 或 Safari 最新版本。');
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
@@ -142,8 +154,18 @@ export default function AudioRecorder({
           return newTime;
         });
       }, 1000);
-    } catch (error) {
-      alert('无法访问麦克风，请检查权限设置');
+    } catch (error: unknown) {
+      if (error instanceof DOMException) {
+        if (error.name === 'NotAllowedError') {
+          alert('麦克风权限被拒绝，请在浏览器地址栏点击锁形图标，允许麦克风访问后刷新页面。');
+        } else if (error.name === 'NotFoundError') {
+          alert('未检测到麦克风设备，请检查设备是否正确连接。');
+        } else {
+          alert(`无法访问麦克风：${error.message}`);
+        }
+      } else {
+        alert('无法访问麦克风，请检查权限设置。');
+      }
     }
   };
 
@@ -160,55 +182,47 @@ export default function AudioRecorder({
     }
   };
 
-  // 上传音频到服务器
+  // 上传音频到 COS（前端直传）
   const uploadAudio = async (audioBlob: Blob) => {
     setIsUploading(true);
     setUploadProgress(0);
     try {
-      // 创建 FormData
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'recording.webm');
-      formData.append('videoId', videoId);
-      formData.append('subtitleId', subtitleId.toString());
-      formData.append('durationSeconds', recordingTime.toString());
+      // 1. 获取预签名 URL
+      const presignRes = await fetch('/api/cos-presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId, subtitleId }),
+      });
+      if (!presignRes.ok) throw new Error('获取上传地址失败');
+      const { uploadUrl, audioUrl: publicUrl } = await presignRes.json();
 
-      // 使用 XMLHttpRequest 来跟踪上传进度
-      const uploadPromise = new Promise<string>((resolve, reject) => {
+      // 2. 直接 PUT 到 COS，带进度
+      await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-
-        // 监听上传进度
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) {
-            const percentComplete = Math.round((e.loaded / e.total) * 100);
-            setUploadProgress(percentComplete);
+            setUploadProgress(Math.round((e.loaded / e.total) * 100));
           }
         });
-
-        // 监听完成
         xhr.addEventListener('load', () => {
-          if (xhr.status === 200) {
-            const response = JSON.parse(xhr.responseText);
-            resolve(response.audioUrl);
-          } else {
-            reject(new Error(`上传失败: ${xhr.status}`));
-          }
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(`上传失败: ${xhr.status}`));
         });
-
-        // 监听错误
-        xhr.addEventListener('error', () => {
-          reject(new Error('网络错误'));
-        });
-
-        xhr.open('POST', '/api/upload-audio');
-        xhr.send(formData);
+        xhr.addEventListener('error', () => reject(new Error('网络错误')));
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', 'audio/webm');
+        xhr.send(audioBlob);
       });
 
-      const publicUrl = await uploadPromise;
+      // 3. 通知服务端保存数据库
+      await fetch('/api/save-audio-record', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId, subtitleId, audioUrl: publicUrl, durationSeconds: recordingTime }),
+      });
 
       setAudioUrl(publicUrl);
-      if (onRecordingComplete) {
-        onRecordingComplete(publicUrl);
-      }
+      if (onRecordingComplete) onRecordingComplete(publicUrl);
     } catch (error) {
       alert(`录音上传失败，请重试`);
     } finally {
@@ -221,6 +235,7 @@ export default function AudioRecorder({
   const playRecording = () => {
     if (audioUrl && audioRef.current) {
       audioRef.current.src = audioUrl;
+      audioRef.current.load();
       audioRef.current.play();
       setIsPlaying(true);
     }
