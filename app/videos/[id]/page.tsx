@@ -5,6 +5,8 @@ import { selectStorageUrl } from '@/lib/storage-urls';
 import VideoWithSubtitles from './components/VideoWithSubtitles';
 import VideoInfo from './components/VideoInfo';
 
+export const dynamic = 'force-dynamic';
+
 export default async function VideoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   // 解包 params（Next.js 15+ 要求）
   const { id } = await params;

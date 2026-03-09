@@ -54,8 +54,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. 使用 Supabase Auth 注册用户
-    // 将手机号作为 email（格式：phone@app.local）
-    const email = `${phone}@app.local`;
+    // 将手机号作为 email（格式：phone@app.example.com）
+    const email = `${phone}@app.example.com`;
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,

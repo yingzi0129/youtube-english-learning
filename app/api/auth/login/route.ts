@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     // 使用 Supabase Auth 登录
     // 将手机号转换为 email 格式
-    const email = `${phone}@app.local`;
+    const email = `${phone}@app.example.com`;
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,

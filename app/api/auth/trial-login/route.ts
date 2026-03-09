@@ -14,7 +14,7 @@ export async function POST() {
     }
 
     const supabase = await createClient();
-    const email = `${phone}@app.local`;
+    const email = `${phone}@app.example.com`;
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
