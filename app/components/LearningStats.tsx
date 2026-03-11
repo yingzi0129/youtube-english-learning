@@ -39,8 +39,8 @@ export default function LearningStats({ delayMs = 0 }: { delayMs?: number }) {
     fetcher,
     {
       revalidateOnFocus: false, // 窗口聚焦时不重新验证
-      revalidateOnReconnect: true, // 重新连接时重新验证
-      dedupingInterval: 5000, // 5秒内的重复请求会被去重
+      revalidateOnReconnect: false, // 重新连接时不重新验证
+      dedupingInterval: 60000, // 60秒内的重复请求会被去重
     }
   );
 

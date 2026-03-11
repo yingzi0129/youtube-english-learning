@@ -96,8 +96,7 @@ export async function GET() {
       checkInDays: checkInRes.count || 0,
       hasCheckedInToday: (todayRes.count || 0) > 0,
     });
-    response.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
-    response.headers.set('Vary', 'Cookie');
+    response.headers.set('Cache-Control', 'no-store');
     return response;
   } catch (error) {
     console.error('获取打卡统计数据错误:', error);

@@ -234,7 +234,7 @@ export default function AudioRecorder({
   // 播放录音
   const playRecording = () => {
     if (audioUrl && audioRef.current) {
-      audioRef.current.src = audioUrl;
+      audioRef.current.src = `${audioUrl}?t=${Date.now()}`;
       audioRef.current.load();
       audioRef.current.play();
       setIsPlaying(true);
