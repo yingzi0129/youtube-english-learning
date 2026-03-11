@@ -72,6 +72,8 @@ export async function POST() {
         return NextResponse.json({
           success: true,
           message: '试用登录成功',
+          must_change_password: false,
+          user: { id: retryData.user.id },
         });
       }
 
@@ -95,6 +97,8 @@ export async function POST() {
     return NextResponse.json({
       success: true,
       message: '试用登录成功',
+      must_change_password: false,
+      user: { id: data.user.id },
     });
   } catch (error) {
     console.error('试用登录错误:', error);

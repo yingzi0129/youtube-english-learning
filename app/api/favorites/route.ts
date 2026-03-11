@@ -57,12 +57,7 @@ export async function GET(request: NextRequest) {
     }
 
     const response = NextResponse.json({ data });
-    response.headers.set(
-      'Cache-Control',
-      mode === 'ids'
-        ? 'private, max-age=30, stale-while-revalidate=60'
-        : 'private, max-age=10, stale-while-revalidate=30'
-    );
+    response.headers.set('Cache-Control', 'no-store');
     response.headers.set('Vary', 'Cookie');
     return response;
   } catch (error) {

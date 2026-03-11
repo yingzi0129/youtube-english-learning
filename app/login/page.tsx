@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { writeMustChangePassword } from '@/lib/auth/must-change';
 
 function LoginForm() {
   const router = useRouter();
@@ -43,6 +44,10 @@ function LoginForm() {
       const data = await response.json();
 
       if (response.ok) {
+        // 登录成功后缓存强制改密状态，减少后续请求
+        if (data?.user?.id) {
+          writeMustChangePassword(data.user.id, Boolean(data.must_change_password));
+        }
         // 登录成功，Supabase Auth 会自动管理 session（通过 cookies）
         // 跳转到首页
         router.push('/');
@@ -70,6 +75,10 @@ function LoginForm() {
       const data = await response.json();
 
       if (response.ok) {
+        // 试用账号默认不强制改密，缓存状态
+        if (data?.user?.id) {
+          writeMustChangePassword(data.user.id, Boolean(data.must_change_password));
+        }
         setTrialStage('success');
         setTimeout(() => {
           router.push('/trial');

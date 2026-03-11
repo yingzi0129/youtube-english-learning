@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: '登录成功',
+      must_change_password: Boolean(profile?.must_change_password),
       user: {
         id: data.user.id,
         phone: data.user.user_metadata.phone,
