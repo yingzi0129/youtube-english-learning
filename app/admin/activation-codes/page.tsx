@@ -13,6 +13,7 @@ interface ActivationCode {
   created_at: string;
   note: string | null;
   phone?: string | null;
+  tag: 'external' | 'internal';
 }
 
 export default function ActivationCodesPage() {
@@ -22,11 +23,14 @@ export default function ActivationCodesPage() {
   const [error, setError] = useState('');
   const [count, setCount] = useState(10);
   const [filter, setFilter] = useState<'all' | 'used' | 'unused'>('all');
+  const [tagFilter, setTagFilter] = useState<'all' | 'external' | 'internal'>('all');
+  const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set());
+  const [updating, setUpdating] = useState(false);
   const { showToast } = useAdminToast();
 
   useEffect(() => {
     fetchCodes();
-  }, [filter]);
+  }, [filter, tagFilter]);
 
   const fetchCodes = async () => {
     setLoading(true);
@@ -43,6 +47,10 @@ export default function ActivationCodesPage() {
         query = query.eq('is_used', true);
       } else if (filter === 'unused') {
         query = query.eq('is_used', false);
+      }
+
+      if (tagFilter !== 'all') {
+        query = query.eq('tag', tagFilter);
       }
 
       const { data: codesData, error: codesError } = await query;
@@ -105,6 +113,7 @@ export default function ActivationCodesPage() {
           is_used: false,
           created_by: 'admin',
           note: `批量生成 - ${new Date().toLocaleString('zh-CN')}`,
+          tag: 'external',
         };
       });
 
@@ -142,15 +151,68 @@ export default function ActivationCodesPage() {
   };
 
   const exportCodes = () => {
-    const unusedCodes = codes.filter(c => !c.is_used);
-    const text = unusedCodes.map(c => c.code).join('\n');
-    const blob = new Blob([text], { type: 'text/plain' });
+    const unusedExternalCodes = codes.filter(c => !c.is_used && c.tag === 'external');
+    const text = unusedExternalCodes.map(c => c.code).join('\n');
+    const blob = new Blob(['\ufeff' + text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `activation-codes-${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+    showToast('success', `已导出 ${unusedExternalCodes.length} 个外部未使用激活码`);
+  };
+
+  const toggleSelectCode = (codeId: string) => {
+    const newSelected = new Set(selectedCodes);
+    if (newSelected.has(codeId)) {
+      newSelected.delete(codeId);
+    } else {
+      newSelected.add(codeId);
+    }
+    setSelectedCodes(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    const unusedCodes = codes.filter(c => !c.is_used);
+    if (selectedCodes.size === unusedCodes.length) {
+      setSelectedCodes(new Set());
+    } else {
+      setSelectedCodes(new Set(unusedCodes.map(c => c.id)));
+    }
+  };
+
+  const updateTags = async (tag: 'external' | 'internal') => {
+    if (selectedCodes.size === 0) {
+      showToast('error', '请先选择要修改的激活码');
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const response = await fetch('/api/admin/activation-codes/update-tag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          codeIds: Array.from(selectedCodes),
+          tag
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '更新失败');
+      }
+
+      showToast('success', `已更新 ${data.updatedCount} 个激活码标签`);
+      setSelectedCodes(new Set());
+      await fetchCodes();
+    } catch (err: any) {
+      showToast('error', err.message || '更新失败');
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const stats = {
@@ -219,37 +281,72 @@ export default function ActivationCodesPage() {
 
       {/* 筛选和导出 */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'all'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            全部
-          </button>
-          <button
-            onClick={() => setFilter('unused')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'unused'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            未使用
-          </button>
-          <button
-            onClick={() => setFilter('used')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              filter === 'used'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            已使用
-          </button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFilter('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filter === 'all'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              全部
+            </button>
+            <button
+              onClick={() => setFilter('unused')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filter === 'unused'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              未使用
+            </button>
+            <button
+              onClick={() => setFilter('used')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filter === 'used'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              已使用
+            </button>
+          </div>
+          <div className="h-6 w-px bg-gray-300"></div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setTagFilter('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                tagFilter === 'all'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              全部标签
+            </button>
+            <button
+              onClick={() => setTagFilter('external')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                tagFilter === 'external'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              外部
+            </button>
+            <button
+              onClick={() => setTagFilter('internal')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                tagFilter === 'internal'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              内部
+            </button>
+          </div>
         </div>
         <button
           onClick={exportCodes}
@@ -261,6 +358,39 @@ export default function ActivationCodesPage() {
           导出未使用
         </button>
       </div>
+
+      {/* 批量操作 */}
+      {selectedCodes.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-blue-800">
+              已选择 {selectedCodes.size} 个激活码
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => updateTags('external')}
+                disabled={updating}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
+              >
+                {updating ? '更新中...' : '标记为外部'}
+              </button>
+              <button
+                onClick={() => updateTags('internal')}
+                disabled={updating}
+                className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm"
+              >
+                {updating ? '更新中...' : '标记为内部'}
+              </button>
+              <button
+                onClick={() => setSelectedCodes(new Set())}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+              >
+                取消选择
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 激活码列表 */}
       {loading ? (
@@ -283,25 +413,36 @@ export default function ActivationCodesPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={codes.filter(c => !c.is_used).length > 0 && selectedCodes.size === codes.filter(c => !c.is_used).length}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
                     激活码
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
                     状态
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                    标签
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
                     绑定手机号
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
                     使用时间
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
                     创建时间
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
                     备注
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">
                     操作
                   </th>
                 </tr>
@@ -309,6 +450,16 @@ export default function ActivationCodesPage() {
               <tbody className="divide-y divide-gray-200">
                 {codes.map((code) => (
                   <tr key={code.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      {!code.is_used && (
+                        <input
+                          type="checkbox"
+                          checked={selectedCodes.has(code.id)}
+                          onChange={() => toggleSelectCode(code.id)}
+                          className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                        />
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-sm font-mono font-semibold text-gray-900">
                       {code.code}
                     </td>
@@ -317,6 +468,13 @@ export default function ActivationCodesPage() {
                         code.is_used ? 'bg-pink-100 text-pink-800' : 'bg-green-100 text-green-800'
                       }`}>
                         {code.is_used ? '已使用' : '未使用'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                        code.tag === 'external' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'
+                      }`}>
+                        {code.tag === 'external' ? '外部' : '内部'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
