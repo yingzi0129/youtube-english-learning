@@ -189,7 +189,8 @@ Extract 1-5 items (words or phrases) based on the sentence content. Prioritize:
 IMPORTANT: Quality over quantity. For short or simple sentences, extract only 1-2 items. Do NOT force extraction of simple or obvious words just to meet a number.
 
 For each item, provide:
-- text: the word or phrase
+- text: the word or phrase (can be in dictionary form, e.g., "give sb a run for one's money")
+- original_text: the EXACT text as it appears in the original sentence (e.g., "gave Stanford's campus a run for its money")
 - type: "word" or "phrase"
 - phonetic: IPA notation in slashes
 - meaning: Chinese translation with part-of-speech (e.g., "n. 控制", "phr. 有点讨厌", "v. 意识到")
@@ -204,8 +205,8 @@ Extract the most valuable learning points (1-5 items). Focus on quality, not qua
 
 Output format example:
 [
-  {"text":"controls","type":"word","phonetic":"/kənˈtroʊlz/","meaning":"v. 控制","example_en":"My phone often controls what I do.","example_zh":"我的手机经常控制我做什么。"},
-  {"text":"kind of","type":"phrase","phonetic":"/kaɪnd əv/","meaning":"phr. 有点；有些","example_en":"I kind of like this movie.","example_zh":"我有点喜欢这部电影。"}
+  {"text":"controls","original_text":"controls","type":"word","phonetic":"/kənˈtroʊlz/","meaning":"v. 控制","example_en":"My phone often controls what I do.","example_zh":"我的手机经常控制我做什么。"},
+  {"text":"kind of","original_text":"kind of","type":"phrase","phonetic":"/kaɪnd əv/","meaning":"phr. 有点；有些","example_en":"I kind of like this movie.","example_zh":"我有点喜欢这部电影。"}
 ]
 
 Return ONLY the JSON array, no other text.`;
@@ -306,11 +307,12 @@ async function saveAnnotations(supabase: any, subtitleId: string, items: any[], 
         throw error;
       }
 
-      // 查找text在原句中的位置
+      // 查找在原句中的位置（优先使用original_text，如果没有则用text）
+      const searchText = (item.original_text || text).trim();
       const lowerContext = contextText.toLowerCase();
-      const lowerText = text.toLowerCase();
-      const start = lowerContext.indexOf(lowerText);
-      const end = start >= 0 ? start + text.length : 0;
+      const lowerSearchText = searchText.toLowerCase();
+      const start = lowerContext.indexOf(lowerSearchText);
+      const end = start >= 0 ? start + searchText.length : 0;
 
       resolved.push({
         id: vocab.id,
