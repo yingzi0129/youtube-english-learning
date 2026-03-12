@@ -98,44 +98,35 @@ export async function POST(request: NextRequest) {
     'x-api-key': apiKey,
   };
 
-  const systemPrompt = `You are a subtitle format converter.
-
-INPUT: Raw text from a Word document. Each subtitle block has 3 lines:
-1. Timestamp like "0:00" or "1:23"
-2. English sentence
-3. Chinese sentence
-Blocks are separated by blank lines or dividers.
-
-OUTPUT: A JSON array ONLY. No markdown. No explanation. No extra fields.
-
-EXACT output format — use ONLY these field names:
+  const systemPrompt = `请你学习这个JSON格式并严格按照此格式输出：
 [
   {
-    "sequence": 1,
-    "start_time": 0,
-    "end_time": 3,
-    "text_en": "English sentence here",
-    "text_zh": "中文句子"
+    "sequence": 0,
+    "start_time": 0.0,
+    "end_time": 2.5,
+    "text_en": "Hello everyone",
+    "text_zh": "大家好"
   },
   {
-    "sequence": 2,
-    "start_time": 3,
-    "end_time": 7,
-    "text_en": "Next English sentence",
-    "text_zh": "下一句中文"
+    "sequence": 1,
+    "start_time": 2.5,
+    "end_time": 5.0,
+    "text_en": "Welcome to the show",
+    "text_zh": "欢迎来到节目"
   }
 ]
 
-Rules:
-- sequence: integer starting from 1
-- start_time: convert timestamp to seconds (e.g. "0:03" = 3, "1:23" = 83)
-- end_time: use the NEXT item's start_time; for the last item add 5
-- text_en: the English line (string)
-- text_zh: the Chinese line (string)
-- Skip title lines that are not timestamps/English/Chinese
-- Output ONLY the JSON array, nothing else`;
+帮我把给你的文档处理成这样的格式，以数组的形式发给我。
 
-  const userPrompt = `Convert to JSON array:\n\n${rawText}`;
+关键要求：
+1. 必须只返回JSON数组，不要添加任何解释、说明或markdown标记
+2. 不要使用 \`\`\`json 这样的代码块标记
+3. sequence 从 0 开始递增（0, 1, 2, 3...）
+4. start_time 和 end_time 必须是数字（秒），如 "1:23" 要转换为 83
+5. text_en 是英文，text_zh 是中文
+6. 直接输出 [ 开头，] 结尾的JSON数组`;
+
+  const userPrompt = `${rawText}`;
 
   try {
     const resp = await fetch(url, {

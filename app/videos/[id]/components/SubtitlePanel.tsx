@@ -371,7 +371,7 @@ export default function SubtitlePanel({
           className={
             isMasked
               ? 'inline-block rounded-md bg-amber-100/80 px-1 text-transparent select-none cursor-pointer'
-              : 'underline decoration-emerald-500 decoration-2 underline-offset-2 font-semibold cursor-pointer hover:bg-emerald-50/60 rounded-sm px-0.5'
+              : 'shadow-[inset_0_-2px_0_0_rgb(16,185,129)] font-semibold cursor-pointer hover:bg-emerald-50/60 rounded-sm px-0.5'
           }
           onClick={(e) => {
             e.stopPropagation();

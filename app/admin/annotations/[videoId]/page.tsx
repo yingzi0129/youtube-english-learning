@@ -77,6 +77,14 @@ export default function VideoAnnotationsPage() {
   const [aiLoading, setAiLoading] = useState<Record<number, boolean>>({});
   const [aiBatching, setAiBatching] = useState(false);
 
+  // 批量选择
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchProcessing, setBatchProcessing] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, success: 0, failed: 0 });
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [currentProcessing, setCurrentProcessing] = useState('');
+  const [batchErrors, setBatchErrors] = useState<Array<{ subtitleId: string; error: string }>>([]);
+
   const enRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
@@ -328,6 +336,98 @@ export default function VideoAnnotationsPage() {
     return total;
   }, [subtitles]);
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === subtitles.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(subtitles.map((s) => s.id)));
+    }
+  };
+
+  const startBatchAnnotate = async () => {
+    if (selectedIds.size === 0) return;
+
+    setShowBatchModal(true);
+    setBatchProcessing(true);
+    setBatchProgress({ current: 0, total: selectedIds.size, success: 0, failed: 0 });
+    setCurrentProcessing('');
+    setBatchErrors([]);
+
+    try {
+      const resp = await fetch('/api/admin/ai/batch-annotate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subtitleIds: Array.from(selectedIds), model: aiModel }),
+      });
+
+      if (!resp.ok) throw new Error('批量处理失败');
+
+      const reader = resp.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) throw new Error('无法读取响应');
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value);
+        const lines = text.split('\n');
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = JSON.parse(line.slice(6));
+
+          if (data.type === 'progress') {
+            setBatchProgress((prev) => ({ ...prev, current: data.current, total: data.total }));
+            setCurrentProcessing(data.text || '');
+          } else if (data.type === 'success') {
+            setBatchProgress((prev) => ({ ...prev, success: prev.success + 1 }));
+          } else if (data.type === 'failed') {
+            setBatchProgress((prev) => ({ ...prev, failed: prev.failed + 1 }));
+            setBatchErrors((prev) => [...prev, { subtitleId: data.subtitleId, error: data.error }]);
+          } else if (data.type === 'complete') {
+            setBatchProgress({ current: data.total, total: data.total, success: data.success, failed: data.failed });
+            // 重新加载字幕数据
+            const supabase = createClient();
+            const { data: newData } = await supabase
+              .from('subtitles')
+              .select('id, sequence, start_time, end_time, text_en, text_zh, annotations')
+              .eq('video_id', videoId)
+              .order('sequence', { ascending: true });
+            if (newData) {
+              setSubtitles(
+                newData.map((r: any) => ({
+                  ...r,
+                  start_time: Number(r.start_time),
+                  end_time: Number(r.end_time),
+                  annotations: Array.isArray(r.annotations) ? r.annotations : [],
+                }))
+              );
+            }
+            showToast('success', `批量标注完成：成功 ${data.success} 条，失败 ${data.failed} 条`);
+          } else if (data.type === 'error') {
+            showToast('error', data.message || '批量处理失败');
+          }
+        }
+      }
+    } catch (err: any) {
+      showToast('error', err.message || '批量处理失败');
+    } finally {
+      setBatchProcessing(false);
+      setSelectedIds(new Set());
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -350,8 +450,34 @@ export default function VideoAnnotationsPage() {
 
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-          <div className="text-sm font-semibold text-gray-700">字幕列表</div>
-          <div className="text-xs text-gray-500">{subtitles.length} 条</div>
+          <div className="flex items-center gap-4">
+            <div className="text-sm font-semibold text-gray-700">字幕列表</div>
+            <div className="text-xs text-gray-500">{subtitles.length} 条</div>
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-purple-600 font-medium">已选 {selectedIds.size} 条</span>
+                <button
+                  onClick={startBatchAnnotate}
+                  disabled={batchProcessing}
+                  className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-semibold hover:bg-purple-700 disabled:opacity-60"
+                >
+                  {batchProcessing ? '处理中...' : '一键AI填充'}
+                </button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-semibold hover:bg-gray-200"
+                >
+                  取消选择
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={toggleSelectAll}
+            className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+          >
+            {selectedIds.size === subtitles.length ? '取消全选' : '全选'}
+          </button>
         </div>
 
         {loading ? (
@@ -361,7 +487,13 @@ export default function VideoAnnotationsPage() {
         ) : (
           <div className="divide-y divide-gray-100">
             {subtitles.map((s) => (
-              <div key={s.id} className="px-5 py-4 flex items-start justify-between gap-4">
+              <div key={s.id} className="px-5 py-4 flex items-start gap-4">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(s.id)}
+                  onChange={() => toggleSelect(s.id)}
+                  className="mt-1 w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="text-xs text-gray-500">{s.sequence} ・ {Number(s.start_time).toFixed(2)}s</div>
                   <div className="mt-1 text-sm font-semibold text-gray-900 break-words">{s.text_en || ''}</div>
@@ -482,7 +614,7 @@ export default function VideoAnnotationsPage() {
                     暂无学习点。先在英文里框选一段文字，再点“添加学习点”。
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
                                         {draftPoints.map((p, idx) => {
                       const typeValue = (p.type || defaultTypeForSelection(p.text)) as LearningPointType;
                       const typeLabel = typeValue === 'word' ? '单词' : '短语';
@@ -596,6 +728,77 @@ export default function VideoAnnotationsPage() {
                   {saving ? '保存中…' : '保存'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 批量处理进度弹窗 */}
+      {showBatchModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="text-lg font-bold text-gray-900">批量AI标注</div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">进度</span>
+                  <span className="font-semibold text-gray-900">
+                    {batchProgress.current} / {batchProgress.total}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-600 transition-all duration-300"
+                    style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {currentProcessing && (
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <div className="text-xs text-gray-500 mb-1">正在处理</div>
+                  <div className="text-sm text-gray-900 line-clamp-2">{currentProcessing}</div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-4">
+                  <div>
+                    <span className="text-green-600 font-semibold">{batchProgress.success}</span>
+                    <span className="text-gray-500 ml-1">成功</span>
+                  </div>
+                  <div>
+                    <span className="text-red-600 font-semibold">{batchProgress.failed}</span>
+                    <span className="text-gray-500 ml-1">失败</span>
+                  </div>
+                </div>
+              </div>
+
+              {batchErrors.length > 0 && (
+                <div className="mt-4 max-h-40 overflow-y-auto">
+                  <div className="text-xs font-semibold text-red-600 mb-2">错误详情：</div>
+                  <div className="space-y-2">
+                    {batchErrors.map((err, idx) => (
+                      <div key={idx} className="p-2 bg-red-50 rounded text-xs text-red-700">
+                        {err.error}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setShowBatchModal(false)}
+                disabled={batchProcessing}
+                className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200 disabled:opacity-60"
+              >
+                {batchProcessing ? '处理中...' : '关闭'}
+              </button>
             </div>
           </div>
         </div>

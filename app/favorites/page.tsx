@@ -145,25 +145,9 @@ export default function FavoritesPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* 标题和操作按钮 */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        {/* 标题 */}
+        <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">我的收藏</h1>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={handleExportAnki}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Download size={18} />
-              导出 Anki 卡片
-            </button>
-            <button
-              onClick={handleGenerateNotes}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <FileText size={18} />
-              生成学习笔记
-            </button>
-          </div>
         </div>
 
         {/* 标签页 */}
