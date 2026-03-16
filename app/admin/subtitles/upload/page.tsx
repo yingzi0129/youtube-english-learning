@@ -80,16 +80,32 @@ export default function UploadSubtitlesPage() {
     return Number.isFinite(num) ? num : fallback;
   };
 
-  const normalizeSubtitleTimes = (items: SubtitleItem[]): SubtitleItem[] => {
+  const tryParseJson = (content: string): any[] | null => {
+    const trimmed = content.trim();
+    // 直接解析
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed;
+      return null;
+    } catch {}
+    // 缺少外层 [ ]，自动补全后再解析
+    try {
+      const wrapped = '[' + trimmed.replace(/,\s*$/, '') + ']';
+      const parsed = JSON.parse(wrapped);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+    return null;
+  };
+
+  const normalizeSubtitleTimes = (items: any[]): SubtitleItem[] => {
     if (!Array.isArray(items)) return [];
 
     const normalized = items.map((item, index) => ({
-      ...item,
       sequence: Number.isFinite(Number(item.sequence)) ? Number(item.sequence) : index + 1,
       start_time: toFiniteNumber(item.start_time, 0),
       end_time: toFiniteNumber(item.end_time, NaN),
-      text_en: item.text_en ?? '',
-      text_zh: item.text_zh ?? '',
+      text_en: (item.text_en ?? item.english_text ?? '') as string,
+      text_zh: (item.text_zh ?? item.chinese_text ?? '') as string,
     }));
 
     let i = 0;
@@ -275,13 +291,11 @@ export default function UploadSubtitlesPage() {
 
       let subtitles: SubtitleItem[];
       if (fileType === 'json') {
-        subtitles = JSON.parse(fileContent);
+        const jsonArr = tryParseJson(fileContent);
+        if (!jsonArr) throw new Error('字幕数据必须是数组格式');
+        subtitles = jsonArr;
       } else {
         subtitles = parseTextFormat(fileContent);
-      }
-
-      if (!Array.isArray(subtitles)) {
-        throw new Error('字幕数据必须是数组格式');
       }
 
       await supabase.from('subtitles').delete().eq('video_id', videoId);
@@ -459,12 +473,12 @@ Erewhon 实际上已经成为了孵化器。`}
             onChange={(e) => {
               const content = e.target.value;
               setFileContent(content);
-              try {
-                const parsed = normalizeSubtitleTimes(JSON.parse(content));
+              const jsonArr = tryParseJson(content);
+              if (jsonArr) {
                 setFileType('json');
-                setPreviewData(parsed);
+                setPreviewData(normalizeSubtitleTimes(jsonArr));
                 setError('');
-              } catch {
+              } else {
                 try {
                   const parsed = parseTextFormat(content);
                   setFileType('text');

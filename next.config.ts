@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'youtube-1317088148.cos.ap-guangzhou.myqcloud.com',
+        hostname: 'yingzi-1317088148.cos.ap-guangzhou.myqcloud.com',
       },
       {
         protocol: 'https',
